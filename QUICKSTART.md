@@ -79,7 +79,7 @@ Edit `config.json` to customize:
 ```json
 {
   "monitoring": {
-    "polling_interval": 10,  // Check every 10 seconds
+    "polling_interval": 1,  // Check every 1 second (terminal-like speed)
     "ping_hosts": ["8.8.8.8", "1.1.1.1", "github.com"]
   },
   "notifications": {

@@ -15,7 +15,7 @@
       "github.com"
     ],
     "http_test_url": "https://www.google.com/generate_204",
-    "polling_interval": 10,
+    "polling_interval": 1,
     "timeout": 5,
     "retry_count": 2,
     "enable_http_test": true

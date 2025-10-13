@@ -82,7 +82,7 @@ AMI (Active Monitor of Internet) is designed with a **laser focus on real intern
 | MultiPing | 2-3% | 4-5% | 100MB | 3s |
 | Zabbix | N/A (server) | N/A | 800MB+ | 30s+ |
 
-**Benchmark environment:** MacBook Pro M1, macOS 14, 3 hosts × 10s interval
+**Benchmark environment:** MacBook Pro M1, macOS 14, 3 hosts × 1s interval
 
 **AMI's optimization secrets:**
 - Parallel threading (non-blocking I/O)
@@ -137,7 +137,7 @@ AMI (Active Monitor of Internet) is designed with a **laser focus on real intern
 **Test Setup:**
 - MacBook Pro M1, macOS 14.2
 - Wi-Fi network with intermittent captive portal
-- 10-minute observation window, 10s polling interval
+- 10-minute observation window, 1s polling interval
 
 **Results:**
 

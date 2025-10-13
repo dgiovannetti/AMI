@@ -46,7 +46,7 @@ AMI features a **completely redesigned UI** with:
 - **Multi-host Ping Testing**: Tests connectivity against 3 configurable hosts in parallel (default: 8.8.8.8, 1.1.1.1, github.com)
 - **HTTP Verification**: Validates actual internet access with HTTP requests
 - **Local Network Detection**: Distinguishes between local network and internet connectivity
-- **Real-time Monitoring**: Configurable polling interval (default: 10 seconds)
+- **Real-time Monitoring**: Configurable polling interval (default: 1 second)
 
 ### User Interface
 - **System Tray Icon**: Minimal, always-visible status indicator
@@ -114,7 +114,7 @@ Edit `config.json` to customize AMI's behavior:
   "monitoring": {
     "ping_hosts": ["8.8.8.8", "1.1.1.1", "github.com"],
     "http_test_url": "https://www.google.com/generate_204",
-    "polling_interval": 10,
+    "polling_interval": 1,
     "timeout": 5,
     "enable_http_test": true
   },
@@ -134,7 +134,7 @@ Edit `config.json` to customize AMI's behavior:
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `polling_interval` | Seconds between checks | 10 |
+| `polling_interval` | Seconds between checks | 1 |
 | `ping_hosts` | Hosts to test connectivity | 8.8.8.8, 1.1.1.1, github.com |
 | `unstable_latency_ms` | Latency threshold for unstable status | 500ms |
 | `unstable_loss_percent` | Packet loss threshold | 30% |
@@ -378,7 +378,7 @@ Choose alternatives if you:
 **Performance benchmarks (MacBook Pro M1, macOS 14):**
 - Idle: 0.8% CPU, 48MB RAM
 - During check: 2.1% CPU spike (200ms), back to <1%
-- 3 hosts × 10s interval = ~0.3KB/s network usage
+- 3 hosts × 1s interval = ~3KB/s network usage
 
 **UX validation:**
 - PyQt6 native widgets ensure OS-level theming respect

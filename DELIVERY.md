@@ -88,7 +88,7 @@ AMI/
 - ✓ Interactive context menu
 - ✓ Tooltip with status summary
 - ✓ Non-blocking background monitoring
-- ✓ Configurable polling interval (default: 10s)
+- ✓ Configurable polling interval (default: 1s - terminal-like speed)
 
 #### 4. User Interface
 - ✓ System tray integration
