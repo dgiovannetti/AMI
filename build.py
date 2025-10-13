@@ -23,9 +23,9 @@ def check_requirements():
                 __import__('PIL')
             else:
                 __import__(package)
-            print(f"  ✓ {package}")
+            print(f"  [OK] {package}")
         except ImportError:
-            print(f"  ✗ {package} - NOT FOUND")
+            print(f"  [FAIL] {package} - NOT FOUND")
             missing.append(package)
     
     if missing:
@@ -36,9 +36,9 @@ def check_requirements():
     # Check PyInstaller
     try:
         __import__('PyInstaller')
-        print("  ✓ PyInstaller")
+        print("  [OK] PyInstaller")
     except ImportError:
-        print("  ✗ PyInstaller - NOT FOUND")
+        print("  [FAIL] PyInstaller - NOT FOUND")
         print("\nInstall PyInstaller with: pip install pyinstaller")
         return False
     
@@ -111,7 +111,7 @@ def build_executable():
     
     try:
         result = subprocess.run(args, check=True)
-        print("\n✓ Build successful!")
+        print("\n[OK] Build successful!")
         
         # Show output location
         dist_dir = Path(__file__).parent / 'dist'
@@ -125,7 +125,7 @@ def build_executable():
         return True
         
     except subprocess.CalledProcessError as e:
-        print(f"\n✗ Build failed: {e}")
+        print(f"\n[FAIL] Build failed: {e}")
         return False
 
 
@@ -144,19 +144,19 @@ def create_installer_package():
     exe_src = dist_dir / exe_name
     if exe_src.exists():
         shutil.copy2(exe_src, package_dir / exe_name)
-        print(f"  ✓ Copied {exe_name}")
+        print(f"  [OK] Copied {exe_name}")
     
     # Copy config.json
     config_src = Path(__file__).parent / 'config.json'
     if config_src.exists():
         shutil.copy2(config_src, package_dir / 'config.json')
-        print("  ✓ Copied config.json")
+        print("  [OK] Copied config.json")
     
     # Copy README
     readme_src = Path(__file__).parent / 'README.md'
     if readme_src.exists():
         shutil.copy2(readme_src, package_dir / 'README.md')
-        print("  ✓ Copied README.md")
+        print("  [OK] Copied README.md")
     
     # Copy icons
     resources_src = Path(__file__).parent / 'resources'
@@ -165,7 +165,7 @@ def create_installer_package():
         if resources_dst.exists():
             shutil.rmtree(resources_dst)
         shutil.copytree(resources_src, resources_dst)
-        print("  ✓ Copied resources/")
+        print("  [OK] Copied resources/")
     
     # Create a quick start guide
     quick_start = package_dir / 'QUICK_START.txt'
@@ -211,15 +211,15 @@ For more information, see README.md
 
 "Sai se sei davvero online."
 """)
-    print("  ✓ Created QUICK_START.txt")
+    print("  [OK] Created QUICK_START.txt")
     
-    print(f"\n✓ Package created: {package_dir}")
+    print(f"\n[OK] Package created: {package_dir}")
     
     # Create ZIP archive
     try:
         archive_name = dist_dir / 'AMI-Package'
         shutil.make_archive(str(archive_name), 'zip', package_dir)
-        print(f"✓ ZIP archive created: {archive_name}.zip")
+        print(f"[OK] ZIP archive created: {archive_name}.zip")
     except Exception as e:
         print(f"Warning: Could not create ZIP archive: {e}")
 
@@ -240,7 +240,7 @@ def clean_build_artifacts():
                 shutil.rmtree(path)
             else:
                 path.unlink()
-            print(f"  ✓ Removed {path.name}")
+            print(f"  [OK] Removed {path.name}")
 
 
 def main():
@@ -251,7 +251,7 @@ def main():
     
     # Check requirements
     if not check_requirements():
-        print("\n✗ Build aborted due to missing requirements")
+        print("\n[FAIL] Build aborted due to missing requirements")
         return 1
     
     # Generate icons
@@ -259,7 +259,7 @@ def main():
     
     # Build executable
     if not build_executable():
-        print("\n✗ Build failed")
+        print("\n[FAIL] Build failed")
         return 1
     
     # Create package
@@ -269,7 +269,7 @@ def main():
     clean_build_artifacts()
     
     print("\n" + "=" * 60)
-    print("✓ Build completed successfully!")
+    print("[OK] Build completed successfully!")
     print("=" * 60)
     print("\nYou can find the executable in the 'dist/AMI-Package' directory")
     print("A ZIP archive has also been created for easy distribution")

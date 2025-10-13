@@ -184,7 +184,7 @@ def save_icon_set(output_dir='../resources'):
     logo = create_wifi_icon(512, colors['green'])
     logo.save(os.path.join(output_dir, 'ami_logo.png'))
     
-    print(f"\n✓ Icons generated successfully in '{output_dir}/'")
+    print(f"\n[OK] Icons generated successfully in '{output_dir}/'")
     print("  Files created:")
     print("    - ami.png (main icon)")
     print("    - ami.ico (Windows icon)")

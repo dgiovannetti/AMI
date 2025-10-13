@@ -14,11 +14,11 @@ def check_python_version():
     print("Checking Python version...")
     
     if sys.version_info < (3, 8):
-        print("✗ Error: Python 3.8 or higher is required")
+        print("[FAIL] Error: Python 3.8 or higher is required")
         print(f"  Current version: {sys.version}")
         return False
     
-    print(f"✓ Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+    print(f"[OK] Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
     return True
 
 
@@ -29,7 +29,7 @@ def install_dependencies():
     requirements_file = Path(__file__).parent / 'requirements.txt'
     
     if not requirements_file.exists():
-        print("✗ Error: requirements.txt not found")
+        print("[FAIL] Error: requirements.txt not found")
         return False
     
     try:
@@ -41,10 +41,10 @@ def install_dependencies():
             '-r',
             str(requirements_file)
         ])
-        print("✓ Dependencies installed successfully")
+        print("[OK] Dependencies installed successfully")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"✗ Error installing dependencies: {e}")
+        print(f"[FAIL] Error installing dependencies: {e}")
         return False
 
 
@@ -55,7 +55,7 @@ def install_build_dependencies():
     requirements_file = Path(__file__).parent / 'requirements-build.txt'
     
     if not requirements_file.exists():
-        print("⚠ Warning: requirements-build.txt not found, skipping")
+        print("[WARN] Warning: requirements-build.txt not found, skipping")
         return True
     
     try:
@@ -67,10 +67,10 @@ def install_build_dependencies():
             '-r',
             str(requirements_file)
         ])
-        print("✓ Build dependencies installed successfully")
+        print("[OK] Build dependencies installed successfully")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"⚠ Warning: Could not install build dependencies: {e}")
+        print(f"[WARN] Warning: Could not install build dependencies: {e}")
         print("  (This is optional and only needed if you want to build the .exe)")
         return True  # Don't fail if build deps can't be installed
 
@@ -83,7 +83,7 @@ def generate_icons():
     icon_script = tools_dir / 'generate_icons.py'
     
     if not icon_script.exists():
-        print("⚠ Warning: Icon generator script not found")
+        print("[WARN] Warning: Icon generator script not found")
         return True
     
     try:
@@ -95,13 +95,13 @@ def generate_icons():
         
         if result.returncode == 0:
             print(result.stdout)
-            print("✓ Icons generated successfully")
+            print("[OK] Icons generated successfully")
             return True
         else:
-            print(f"⚠ Warning: Icon generation failed:\n{result.stderr}")
+            print(f"[WARN] Warning: Icon generation failed:\n{result.stderr}")
             return True  # Don't fail installation
     except Exception as e:
-        print(f"⚠ Warning: Could not generate icons: {e}")
+        print(f"[WARN] Warning: Could not generate icons: {e}")
         return True  # Don't fail installation
 
 
@@ -122,9 +122,9 @@ def verify_installation():
     for module in required_modules:
         try:
             __import__(module)
-            print(f"  ✓ {module}")
+            print(f"  [OK] {module}")
         except ImportError:
-            print(f"  ✗ {module} - FAILED")
+            print(f"  [FAIL] {module} - FAILED")
             all_ok = False
     
     return all_ok
@@ -155,9 +155,9 @@ def create_desktop_shortcut():
             shortcut.IconLocation = str(Path(__file__).parent / 'resources' / 'ami.ico')
             shortcut.save()
             
-            print(f"✓ Desktop shortcut created: {path}")
+            print(f"[OK] Desktop shortcut created: {path}")
         except Exception as e:
-            print(f"⚠ Could not create desktop shortcut: {e}")
+            print(f"[WARN] Could not create desktop shortcut: {e}")
             print("  You can manually create a shortcut to AMI.py")
 
 
@@ -175,7 +175,7 @@ def main():
     
     # Install dependencies
     if not install_dependencies():
-        print("\n✗ Installation failed")
+        print("\n[FAIL] Installation failed")
         return 1
     
     # Install build dependencies (optional)
@@ -186,7 +186,7 @@ def main():
     
     # Verify installation
     if not verify_installation():
-        print("\n⚠ Installation completed with warnings")
+        print("\n[WARN] Installation completed with warnings")
         print("Some modules could not be imported. Please check the errors above.")
         return 1
     
@@ -194,7 +194,7 @@ def main():
     create_desktop_shortcut()
     
     print("\n" + "=" * 60)
-    print("✓ Installation completed successfully!")
+    print("[OK] Installation completed successfully!")
     print("=" * 60)
     print("\nTo run AMI:")
     print(f"  python {Path(__file__).parent / 'AMI.py'}")
@@ -209,5 +209,5 @@ if __name__ == '__main__':
     try:
         sys.exit(main())
     except KeyboardInterrupt:
-        print("\n\n✗ Installation cancelled by user")
+        print("\n\n[FAIL] Installation cancelled by user")
         sys.exit(1)
