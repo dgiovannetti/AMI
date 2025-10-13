@@ -1,0 +1,115 @@
+═══════════════════════════════════════════════════════════════
+  AMI - Come Creare l'Eseguibile Windows (.exe)
+═══════════════════════════════════════════════════════════════
+
+⚠️  SEI SU macOS - Non puoi creare .exe Windows direttamente
+    Serve una macchina Windows o GitHub Actions
+
+───────────────────────────────────────────────────────────────
+  🎯 METODO 1: Build su Windows (Raccomandato)
+───────────────────────────────────────────────────────────────
+
+1. Copia tutto il progetto AMI su una macchina Windows
+
+2. Su Windows, apri PowerShell nella cartella AMI
+
+3. Esegui:
+   
+   .\build_windows.bat
+   
+   Oppure manualmente:
+   
+   pip install -r requirements.txt
+   pip install -r requirements-build.txt
+   python build.py
+
+4. L'eseguibile sarà in: dist\AMI-Package\AMI.exe
+
+───────────────────────────────────────────────────────────────
+  🚀 METODO 2: GitHub Actions (Automatico)
+───────────────────────────────────────────────────────────────
+
+1. Fai push del progetto su GitHub:
+   
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git remote add origin https://github.com/TUO_USERNAME/AMI.git
+   git push -u origin main
+
+2. Vai su GitHub → Actions
+
+3. Il build partirà automaticamente (5-10 minuti)
+
+4. Scarica "AMI-Windows.zip" dagli artifacts
+
+5. Per creare una release:
+   
+   git tag v1.0.0
+   git push origin v1.0.0
+   
+   GitHub creerà automaticamente la release con l'exe!
+
+───────────────────────────────────────────────────────────────
+  📋 File Creati per Te
+───────────────────────────────────────────────────────────────
+
+✅ build_windows.bat           - Script batch per Windows
+✅ BUILD_WINDOWS.md            - Guida dettagliata Windows
+✅ WINDOWS_EXE_GUIDE.md        - Guida completa exe
+✅ .github/workflows/build.yml - GitHub Actions (auto-build)
+
+───────────────────────────────────────────────────────────────
+  🔍 Cosa Hai Già
+───────────────────────────────────────────────────────────────
+
+✅ Codice sorgente completo e funzionante
+✅ Build script configurato e testato
+✅ Dipendenze specificate
+✅ Icone generate
+✅ Configurazione pronta
+✅ GitHub Actions configurato
+
+───────────────────────────────────────────────────────────────
+  💡 Raccomandazione
+───────────────────────────────────────────────────────────────
+
+OPZIONE A - Hai Windows disponibile?
+  → Usa build_windows.bat (5 minuti)
+
+OPZIONE B - Solo macOS?
+  → Usa GitHub Actions (10 minuti setup + build automatico)
+
+OPZIONE C - Urgente?
+  → Usa VM Windows (VirtualBox/Parallels) + build_windows.bat
+
+───────────────────────────────────────────────────────────────
+  📦 Risultato Finale
+───────────────────────────────────────────────────────────────
+
+dist/
+└── AMI-Package/
+    ├── AMI.exe           ← Eseguibile Windows (~120 MB)
+    ├── config.json       ← Configurazione
+    ├── README.md         ← Documentazione
+    └── resources/        ← Icone
+
+───────────────────────────────────────────────────────────────
+  🎯 Quick Start per GitHub Actions
+───────────────────────────────────────────────────────────────
+
+# Se hai già un repo GitHub
+cd /Users/dgiovannetti/Documents/GitHub/AMI
+git add .
+git commit -m "Add Windows build support"
+git push
+
+# Poi vai su GitHub.com → tuo repo → Actions → Build AMI
+
+───────────────────────────────────────────────────────────────
+
+Per maggiori dettagli, leggi:
+- BUILD_WINDOWS.md (istruzioni Windows)
+- WINDOWS_EXE_GUIDE.md (guida completa)
+
+═══════════════════════════════════════════════════════════════

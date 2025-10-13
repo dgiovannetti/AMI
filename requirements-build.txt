@@ -1,0 +1,8 @@
+# Build-time dependencies for AMI
+# Install these to build the executable
+
+pyinstaller==6.3.0
+Pillow==10.1.0
+
+# Runtime dependencies (also needed)
+-r requirements.txt

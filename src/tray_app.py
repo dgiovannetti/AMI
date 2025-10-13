@@ -1,0 +1,537 @@
+"""
+AMI - Active Monitor of Internet
+System Tray Application
+
+Main application with system tray icon and menu
+"""
+
+import sys
+import json
+import os
+from pathlib import Path
+from PyQt6.QtWidgets import (QApplication, QSystemTrayIcon, QMenu, 
+                            QMessageBox)
+from PyQt6.QtCore import QTimer, Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QIcon, QAction, QPixmap, QPainter, QColor, QFont, QRadialGradient, QPen
+
+from network_monitor import NetworkMonitor
+from logger import EventLogger
+from notifier import Notifier
+from api_server import APIServer
+from splash_screen import UltraModernSplashScreen
+from settings_dialog import SettingsDialog
+
+
+class MonitorThread(QThread):
+    """
+    Background thread for network monitoring
+    Emits signals when status changes
+    """
+    status_updated = pyqtSignal(object)  # ConnectionStatus object
+    
+    def __init__(self, monitor: NetworkMonitor):
+        super().__init__()
+        self.monitor = monitor
+        self.running = True
+    
+    def run(self):
+        """Run a single check"""
+        if self.running:
+            status = self.monitor.check_connection()
+            self.status_updated.emit(status)
+    
+    def stop(self):
+        """Stop the monitoring thread"""
+        self.running = False
+
+
+class SystemTrayApp:
+    """
+    Main system tray application
+    """
+    
+    def __init__(self):
+        self.app = QApplication(sys.argv)
+        self.app.setQuitOnLastWindowClosed(False)
+        
+        # Show splash screen
+        self.splash = UltraModernSplashScreen()
+        self.splash.show()
+        self.splash.showMessage("Loading configuration...")
+        self.app.processEvents()
+        
+        # Load configuration
+        self.config = self.load_config()
+        self.splash.showMessage("Initializing network monitor...")
+        self.app.processEvents()
+        
+        # Initialize components
+        self.monitor = NetworkMonitor(self.config)
+        self.splash.showMessage("Starting logger...")
+        self.app.processEvents()
+        
+        self.logger = EventLogger(self.config)
+        self.splash.showMessage("Preparing notifications...")
+        self.app.processEvents()
+        
+        self.notifier = Notifier(self.config)
+        self.splash.showMessage("Starting API server...")
+        
+        self.api_server = APIServer(self.config, self.monitor)
+        
+        # Current status
+        self.current_status = None
+        
+        # Start API server if enabled
+        self.splash.showMessage("Finalizing...")
+        self.app.processEvents()
+        self.api_server.start()
+        
+        # Create tray icon
+        self.tray_icon = QSystemTrayIcon(self.app)
+        self.tray_icon.setToolTip("AMI - Starting...")
+        
+        # Set initial icon
+        self.update_icon('offline')
+        
+        # Create context menu
+        self.create_menu()
+        
+        # Double-click to show dashboard
+        self.tray_icon.activated.connect(self.on_tray_activated)
+        
+        # Set up monitoring timer
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.check_connection)
+        interval = self.config['monitoring']['polling_interval'] * 1000  # Convert to ms
+        self.timer.start(interval)
+        
+        # Show tray icon
+        self.tray_icon.show()
+        
+        # Perform initial check
+        self.check_connection()
+        
+        # Reference to dashboard window (will be created on demand)
+        self.dashboard = None
+        
+        # Close splash screen with fade out (3 seconds display)
+        QTimer.singleShot(3000, self.close_splash)
+        
+        # Show dashboard on start if configured or forced via env variable
+        show_dashboard = (
+            self.config.get('ui', {}).get('show_dashboard_on_start', False) or
+            os.environ.get('AMI_FORCE_DASHBOARD') == '1'
+        )
+        if show_dashboard:
+            QTimer.singleShot(3500, self.show_dashboard)  # Delay 3.5s for splash to close
+    
+    def close_splash(self):
+        """Close splash screen with animation"""
+        if hasattr(self, 'splash'):
+            self.splash.fade_out()
+    
+    def load_config(self) -> dict:
+        """Load configuration from config.json"""
+        # Get base path - works for both development and PyInstaller
+        if getattr(sys, 'frozen', False):
+            # Running as compiled executable
+            base_path = Path(sys._MEIPASS)
+        else:
+            # Running as script
+            base_path = Path(__file__).parent.parent
+
+        self.base_path = base_path
+        self.config_path = base_path / 'config.json'
+
+        try:
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            QMessageBox.critical(None, "Error", f"Failed to load config.json: {e}\nPath: {self.config_path}")
+            sys.exit(1)
+
+    def save_config(self):
+        """Persist current config to config.json"""
+        try:
+            with open(self.config_path, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            QMessageBox.critical(None, "Error", f"Failed to save config.json: {e}\nPath: {self.config_path}")
+
+    def apply_config(self, new_config: dict):
+        """Apply config changes to running components"""
+        self.config = new_config
+        # Apply to monitor
+        mon = self.monitor
+        mon.hosts = new_config['monitoring']['ping_hosts']
+        mon.http_test_url = new_config['monitoring']['http_test_url']
+        mon.timeout = new_config['monitoring']['timeout']
+        mon.retry_count = new_config['monitoring']['retry_count']
+        mon.enable_http_test = new_config['monitoring']['enable_http_test']
+        mon.unstable_latency = new_config['thresholds']['unstable_latency_ms']
+        mon.unstable_loss = new_config['thresholds']['unstable_loss_percent']
+
+        # Timer interval
+        try:
+            interval = int(new_config['monitoring']['polling_interval']) * 1000
+            self.timer.setInterval(interval)
+        except Exception:
+            pass
+
+        # Notifier flags
+        notif = self.notifier
+        ncfg = new_config.get('notifications', {})
+        notif.enabled = ncfg.get('enabled', notif.enabled)
+        notif.silent_mode = ncfg.get('silent_mode', notif.silent_mode)
+        notif.notify_on_disconnect = ncfg.get('notify_on_disconnect', notif.notify_on_disconnect)
+        notif.notify_on_reconnect = ncfg.get('notify_on_reconnect', notif.notify_on_reconnect)
+        notif.notify_on_unstable = ncfg.get('notify_on_unstable', notif.notify_on_unstable)
+
+    
+    def create_menu(self):
+        """Create system tray context menu"""
+        menu = QMenu()
+        
+        # Status display (disabled, just for info)
+        self.status_action = QAction("Status: Checking...", menu)
+        self.status_action.setEnabled(False)
+        menu.addAction(self.status_action)
+        
+        self.latency_action = QAction("Latency: --", menu)
+        self.latency_action.setEnabled(False)
+        menu.addAction(self.latency_action)
+        
+        self.uptime_action = QAction("Uptime: --", menu)
+        self.uptime_action.setEnabled(False)
+        menu.addAction(self.uptime_action)
+        
+        menu.addSeparator()
+        
+        # Test now
+        test_action = QAction("🔄 Test Now", menu)
+        test_action.triggered.connect(self.manual_test)
+        menu.addAction(test_action)
+        
+        # Dashboard
+        dashboard_action = QAction("📊 Dashboard", menu)
+        dashboard_action.triggered.connect(self.show_dashboard)
+        menu.addAction(dashboard_action)
+        
+        menu.addSeparator()
+        
+        # Settings
+        settings_action = QAction("⚙️ Settings", menu)
+        settings_action.triggered.connect(self.show_settings)
+        menu.addAction(settings_action)
+        
+        # View Logs
+        logs_action = QAction("📄 View Logs", menu)
+        logs_action.triggered.connect(self.view_logs)
+        menu.addAction(logs_action)
+        
+        menu.addSeparator()
+        
+        # About
+        about_action = QAction("ℹ️ About", menu)
+        about_action.triggered.connect(self.show_about)
+        menu.addAction(about_action)
+        
+        # Exit
+        exit_action = QAction("❌ Exit", menu)
+        exit_action.triggered.connect(self.exit_app)
+        menu.addAction(exit_action)
+        
+        self.tray_icon.setContextMenu(menu)
+    
+    def create_icon(self, color: str) -> QIcon:
+        """
+        Create professional enterprise tray icon
+
+        Args:
+            color: Color name ('green', 'yellow', 'red')
+
+        Returns:
+            QIcon object
+        """
+        # Create 128x128 for high DPI
+        pixmap = QPixmap(128, 128)
+        pixmap.fill(Qt.GlobalColor.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Clean colors for enterprise
+        if color == 'green':
+            main_color = QColor(16, 185, 129)  # Emerald-600
+            glow_color = QColor(16, 185, 129, 100)
+        elif color == 'yellow':
+            main_color = QColor(245, 158, 11)  # Amber-600
+            glow_color = QColor(245, 158, 11, 100)
+        else:  # red
+            main_color = QColor(239, 68, 68)   # Red-600
+            glow_color = QColor(239, 68, 68, 100)
+
+        # Subtle glow
+        painter.setBrush(glow_color)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(16, 16, 96, 96)
+
+        # Dark background circle
+        painter.setBrush(QColor(248, 250, 252))  # Gray-50
+        painter.drawEllipse(24, 24, 80, 80)
+
+        # Main colored circle
+        painter.setBrush(main_color)
+        painter.drawEllipse(32, 32, 64, 64)
+
+        # Highlight for depth
+        highlight_gradient = QRadialGradient(64, 48, 32)
+        highlight_gradient.setColorAt(0, QColor(255, 255, 255, 80))
+        highlight_gradient.setColorAt(1, Qt.GlobalColor.transparent)
+        painter.setBrush(highlight_gradient)
+        painter.drawEllipse(40, 40, 48, 48)
+
+        # Clean WiFi symbol
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        pen = QPen(QColor(255, 255, 255))
+        pen.setWidth(4)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+
+        # WiFi arcs
+        painter.drawArc(48, 52, 32, 32, 0, 180 * 16)
+        painter.drawArc(40, 44, 48, 48, 0, 180 * 16)
+
+        # WiFi dot
+        painter.setBrush(QColor(255, 255, 255))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(60, 76, 8, 8)
+
+        painter.end()
+
+        return QIcon(pixmap)
+    
+    def update_icon(self, status: str):
+        """
+        Update tray icon based on status
+        
+        Args:
+            status: 'online', 'unstable', or 'offline'
+        """
+        if status == 'online':
+            icon = self.create_icon('green')
+        elif status == 'unstable':
+            icon = self.create_icon('yellow')
+        else:
+            icon = self.create_icon('red')
+        
+        self.tray_icon.setIcon(icon)
+    
+    def update_tooltip(self, status):
+        """
+        Update tooltip with current status information
+        
+        Args:
+            status: ConnectionStatus object
+        """
+        tooltip_parts = ["AMI - Active Monitor of Internet"]
+        
+        # Status
+        status_emoji = {'online': '🟢', 'unstable': '🟡', 'offline': '🔴'}
+        tooltip_parts.append(f"{status_emoji.get(status.status, '⚫')} {status.status.upper()}")
+        
+        # Latency
+        if status.avg_latency_ms:
+            tooltip_parts.append(f"Latency: {status.avg_latency_ms:.0f}ms")
+        
+        # Uptime
+        uptime_pct = self.monitor.get_uptime_percentage()
+        tooltip_parts.append(f"Uptime: {uptime_pct:.1f}%")
+        
+        self.tray_icon.setToolTip("\n".join(tooltip_parts))
+    
+    def update_menu_info(self, status):
+        """
+        Update menu items with current status
+        
+        Args:
+            status: ConnectionStatus object
+        """
+        # Status
+        status_emoji = {'online': '🟢', 'unstable': '🟡', 'offline': '🔴'}
+        self.status_action.setText(f"Status: {status_emoji.get(status.status, '⚫')} {status.status.upper()}")
+        
+        # Latency
+        if status.avg_latency_ms:
+            self.latency_action.setText(f"Latency: {status.avg_latency_ms:.0f}ms")
+        else:
+            self.latency_action.setText("Latency: N/A")
+        
+        # Uptime
+        uptime_pct = self.monitor.get_uptime_percentage()
+        uptime_dur = self.monitor.get_uptime_duration()
+        self.uptime_action.setText(f"Uptime: {uptime_pct:.1f}% ({uptime_dur})")
+    
+    def check_connection(self):
+        """Perform connection check in background thread"""
+        # Create and start monitor thread
+        self.monitor_thread = MonitorThread(self.monitor)
+        self.monitor_thread.status_updated.connect(self.on_status_updated)
+        self.monitor_thread.start()
+    
+    def on_status_updated(self, status):
+        """
+        Handle status update from monitor thread
+        
+        Args:
+            status: ConnectionStatus object
+        """
+        self.current_status = status
+        
+        # Update UI
+        self.update_icon(status.status)
+        self.update_tooltip(status)
+        self.update_menu_info(status)
+        
+        # Log event
+        self.logger.log_status(status)
+        
+        # Show notification if status changed
+        self.notifier.notify_status_change(status)
+        
+        # Update dashboard if open
+        if self.dashboard and self.dashboard.isVisible():
+            self.dashboard.update_data(status, self.monitor.get_statistics())
+    
+    def manual_test(self):
+        """Perform manual connection test"""
+        self.tray_icon.showMessage(
+            "AMI",
+            "Running connection test...",
+            QSystemTrayIcon.MessageIcon.Information,
+            2000
+        )
+        self.check_connection()
+    
+    def on_tray_activated(self, reason):
+        """Handle tray icon activation (clicks)"""
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            self.toggle_dashboard()
+    
+    def toggle_dashboard(self):
+        """Toggle dashboard visibility"""
+        if self.dashboard and self.dashboard.isVisible():
+            self.dashboard.hide()
+        else:
+            self.show_dashboard()
+    
+    def show_dashboard(self):
+        """Show dashboard window"""
+        if self.dashboard is None:
+            from dashboard import EnterpriseDashboard
+            self.dashboard = EnterpriseDashboard(self.config, self.monitor, self.tray_icon)
+        
+        if self.current_status:
+            self.dashboard.update_data(self.current_status, self.monitor.get_statistics())
+        
+        self.dashboard.show()
+        self.dashboard.raise_()
+        self.dashboard.activateWindow()
+    
+    def show_settings(self):
+        """Show settings dialog and apply changes"""
+        dlg = SettingsDialog(self.config)
+        if dlg.exec():
+            new_cfg = dlg.get_config()
+            self.apply_config(new_cfg)
+            self.save_config()
+            # Inform user
+            try:
+                self.tray_icon.showMessage(
+                    "AMI Settings",
+                    "Settings saved and applied",
+                    QSystemTrayIcon.MessageIcon.Information,
+                    2000
+                )
+            except Exception:
+                pass
+            # Trigger an immediate check using new settings
+            self.check_connection()
+    
+    def view_logs(self):
+        """Open log file"""
+        log_file = self.config['logging']['log_file']
+        if os.path.exists(log_file):
+            # Open with default application
+            import subprocess
+            if sys.platform == 'win32':
+                os.startfile(log_file)
+            elif sys.platform == 'darwin':
+                subprocess.call(['open', log_file])
+            else:
+                subprocess.call(['xdg-open', log_file])
+        else:
+            QMessageBox.information(None, "Logs", "No log file found yet.")
+    
+    def show_about(self):
+        """Show about dialog"""
+        about_text = """
+        <h2>AMI - Active Monitor of Internet</h2>
+        <p><b>Version:</b> {version}</p>
+        <p><i>"Sai se sei davvero online."</i></p>
+        <br>
+        <p>AMI monitors your internet connection in real-time,<br>
+        distinguishing between local network and actual<br>
+        internet connectivity.</p>
+        <br>
+        <p><b>Features:</b></p>
+        <ul>
+        <li>Real-time connection monitoring</li>
+        <li>System tray integration (Windows & macOS)</li>
+        <li>Minimize to tray support</li>
+        <li>Multi-host ping testing</li>
+        <li>Connection statistics and graphs</li>
+        <li>Event logging & notifications</li>
+        </ul>
+        <br>
+        <p>© 2025 <b>CiaoIM™</b> di Daniel Giovannetti</p>
+        <p><a href="https://ciaoim.tech">ciaoim.tech</a></p>
+        <p style="font-size: 9px; color: #666;"><i>Crafted logic. Measured force. Front-end vision,<br>
+        compiled systems, and hardcoded ethics.</i></p>
+        <p style="font-size: 8px; color: #888;"><i>Intuizione colta insieme a Giovanni Calvario in aliscafo<br>
+        per il 40° Convegno di Capri dei Giovani Imprenditori</i></p>
+        """.format(version=self.config['app']['version'])
+        
+        msg = QMessageBox()
+        msg.setWindowTitle("About AMI")
+        msg.setTextFormat(Qt.TextFormat.RichText)
+        msg.setText(about_text)
+        msg.exec()
+    
+    def exit_app(self):
+        """Exit the application"""
+        self.timer.stop()
+        self.api_server.stop()
+        self.tray_icon.hide()
+        QApplication.quit()
+    
+    def run(self):
+        """Run the application"""
+        return self.app.exec()
+
+
+def main():
+    """Main entry point"""
+    # Set application info
+    QApplication.setApplicationName("AMI")
+    QApplication.setApplicationDisplayName("AMI - Active Monitor of Internet")
+    QApplication.setOrganizationName("AMI Project")
+    
+    # Create and run app
+    app = SystemTrayApp()
+    sys.exit(app.run())
+
+
+if __name__ == '__main__':
+    main()
