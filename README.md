@@ -80,10 +80,25 @@ AMI features a **completely redesigned UI** with:
 - Python 3.8+ (for development) or use pre-built executable
 
 ### Option 1: Pre-built Executable (Recommended for Users)
+
+#### Windows
 1. Download the latest `AMI-Package.zip` from releases
 2. Extract the ZIP file to your preferred location
 3. Run `AMI.exe`
 4. The application will appear in your system tray
+
+#### macOS
+1. Download the latest `AMI-Package.zip` from releases
+2. Extract the ZIP file to your preferred location
+3. **Important:** macOS will block unsigned executables by default
+   - **Right-click** (or Ctrl+click) on the `AMI` executable
+   - Select **"Open"** from the menu
+   - Click **"Open"** in the confirmation dialog
+   - Alternatively, use Terminal: `cd AMI-Package && xattr -cr AMI && chmod +x AMI && ./AMI`
+   - 📖 See [MACOS_SECURITY.md](MACOS_SECURITY.md) for detailed Gatekeeper bypass instructions
+4. The application will appear in your menu bar
+
+**Note:** AMI is a UNIX executable (not a `.app` bundle), so it appears as a generic file in Finder.
 
 ### Option 2: From Source (For Developers)
 

@@ -158,6 +158,13 @@ def create_installer_package():
         shutil.copy2(readme_src, package_dir / 'README.md')
         print("  [OK] Copied README.md")
     
+    # Copy MACOS_SECURITY.md (macOS only)
+    if sys.platform == 'darwin':
+        macos_sec = Path(__file__).parent / 'MACOS_SECURITY.md'
+        if macos_sec.exists():
+            shutil.copy2(macos_sec, package_dir / 'MACOS_SECURITY.md')
+            print("  [OK] Copied MACOS_SECURITY.md")
+    
     # Copy icons
     resources_src = Path(__file__).parent / 'resources'
     if resources_src.exists():
@@ -169,10 +176,61 @@ def create_installer_package():
     
     # Create a quick start guide
     quick_start = package_dir / 'QUICK_START.txt'
+    is_macos = sys.platform == 'darwin'
+    
     with open(quick_start, 'w', encoding='utf-8') as f:
-        f.write("""
-AMI - Active Monitor of Internet
-Quick Start Guide
+        if is_macos:
+            f.write("""AMI - Active Monitor of Internet
+Quick Start Guide (macOS)
+
+IMPORTANT: AMI is a UNIX executable (not a .app bundle).
+macOS Gatekeeper will block it because it's not signed with an Apple Developer certificate.
+
+1. FIRST RUN - Choose one method:
+
+   METHOD A - Right-click (Easiest):
+   - RIGHT-CLICK (or Ctrl+click) on the AMI executable
+   - Select "Open" from the menu
+   - Click "Open" in the confirmation dialog
+   - AMI will start and appear in the menu bar
+   
+   METHOD B - Terminal:
+   - Open Terminal in the AMI-Package folder
+   - Run: xattr -cr AMI && chmod +x AMI && ./AMI
+   
+   After the first run, you can double-click AMI normally.
+   
+   See MACOS_SECURITY.md for more details and troubleshooting.
+
+2. CONFIGURATION:
+   - Right-click the menu bar icon and select "Settings"
+   - Or edit config.json manually for advanced options
+
+3. FEATURES:
+   - Green icon: Online
+   - Yellow icon: Unstable connection
+   - Red icon: Offline
+   
+   Right-click the menu bar icon to:
+   - View current status
+   - Test connection manually
+   - Open dashboard with statistics
+   - View connection logs
+   - Exit the application
+
+4. TROUBLESHOOTING:
+   - Check ami_log.csv for connection history
+   - Edit config.json to adjust polling interval or test hosts
+   - See MACOS_SECURITY.md for Gatekeeper issues
+   - Activity Monitor shows "AMI" if running
+
+For more information, see README.md and MACOS_SECURITY.md
+
+"Sai se sei davvero online."
+""")
+        else:
+            f.write("""AMI - Active Monitor of Internet
+Quick Start Guide (Windows)
 
 1. FIRST RUN:
    - Double-click AMI.exe to start
@@ -182,12 +240,11 @@ Quick Start Guide
 2. CONFIGURATION:
    - Right-click the tray icon and select "Settings"
    - Or edit config.json manually for advanced options
-   - Restart AMI after changing settings
 
 3. FEATURES:
-   - Green icon 🟢: Online
-   - Yellow icon 🟡: Unstable connection
-   - Red icon 🔴: Offline
+   - Green icon: Online
+   - Yellow icon: Unstable connection
+   - Red icon: Offline
    
    Right-click the tray icon to:
    - View current status
@@ -197,7 +254,6 @@ Quick Start Guide
    - Exit the application
 
 4. AUTO-START (Optional):
-   - To start AMI automatically with Windows:
    - Open config.json
    - Set "auto_start": true under "startup"
    - Restart AMI
