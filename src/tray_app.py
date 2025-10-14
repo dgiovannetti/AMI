@@ -20,6 +20,8 @@ from notifier import Notifier
 from api_server import APIServer
 from splash_screen import UltraModernSplashScreen
 from settings_dialog import SettingsDialog
+from updater import UpdateManager
+from update_dialog import UpdateDialog
 
 
 class MonitorThread(QThread):
@@ -114,6 +116,24 @@ class SystemTrayApp:
         
         # Reference to dashboard window (will be created on demand)
         self.dashboard = None
+        
+        # Initialize updater
+        self.updater = None
+        self.update_timer = None
+        if self.config.get('updates', {}).get('enabled', True):
+            app_version = self.config.get('app', {}).get('version', '1.0.0')
+            github_repo = self.config.get('updates', {}).get('github_repo', 'dgiovannetti/AMI')
+            self.updater = UpdateManager(app_version, github_repo)
+            
+            # Check for updates on startup if configured
+            if self.config.get('updates', {}).get('check_on_startup', True):
+                QTimer.singleShot(5000, self.check_for_updates)  # Check 5s after startup
+            
+            # Set up periodic update checks
+            check_interval = self.config.get('updates', {}).get('check_interval_hours', 24)
+            self.update_timer = QTimer()
+            self.update_timer.timeout.connect(self.check_for_updates)
+            self.update_timer.start(check_interval * 3600 * 1000)  # Convert hours to ms
         
         # Close splash screen with fade out (3 seconds display)
         QTimer.singleShot(3000, self.close_splash)
@@ -229,6 +249,12 @@ class SystemTrayApp:
         logs_action = QAction("📄 View Logs", menu)
         logs_action.triggered.connect(self.view_logs)
         menu.addAction(logs_action)
+        
+        # Check for updates (if enabled)
+        if self.updater:
+            update_action = QAction("🔄 Check for Updates", menu)
+            update_action.triggered.connect(self.check_for_updates)
+            menu.addAction(update_action)
         
         menu.addSeparator()
         
@@ -474,6 +500,47 @@ class SystemTrayApp:
         else:
             QMessageBox.information(None, "Logs", "No log file found yet.")
     
+    def check_for_updates(self):
+        """Check for available updates"""
+        if not self.updater:
+            return
+        
+        print("[UPDATE] Checking for updates...")
+        
+        try:
+            update_info = self.updater.check_for_updates()
+            
+            if update_info:
+                print(f"[UPDATE] New version available: {update_info['version']}")
+                
+                # Check if update is mandatory
+                can_postpone = self.updater.can_postpone()
+                
+                # Show update notification in tray
+                if self.config.get('updates', {}).get('notify_on_update', True):
+                    message = f"Version {update_info['version']} is available!"
+                    if not can_postpone:
+                        message += " (Update required)"
+                    
+                    try:
+                        self.tray_icon.showMessage(
+                            "AMI Update Available",
+                            message,
+                            QSystemTrayIcon.MessageIcon.Information,
+                            5000
+                        )
+                    except Exception:
+                        pass
+                
+                # Show update dialog
+                dlg = UpdateDialog(self.updater, update_info)
+                dlg.exec()
+            else:
+                print("[UPDATE] No updates available")
+        
+        except Exception as e:
+            print(f"[UPDATE] Error checking for updates: {e}")
+    
     def show_about(self):
         """Show about dialog"""
         about_text = """
@@ -493,6 +560,7 @@ class SystemTrayApp:
         <li>Multi-host ping testing</li>
         <li>Connection statistics and graphs</li>
         <li>Event logging & notifications</li>
+        <li>Automatic OTA updates</li>
         </ul>
         <br>
         <p>© 2025 <b>CiaoIM™</b> di Daniel Giovannetti</p>

@@ -46,5 +46,13 @@
   "ui": {
     "theme": "auto",
     "show_dashboard_on_start": true
+  },
+  "updates": {
+    "enabled": true,
+    "check_on_startup": true,
+    "check_interval_hours": 24,
+    "github_repo": "dgiovannetti/AMI",
+    "max_postponements": 3,
+    "notify_on_update": true
   }
 }
