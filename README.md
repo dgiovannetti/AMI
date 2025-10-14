@@ -67,11 +67,15 @@ AMI features a **completely redesigned UI** with:
 - **Uptime Tracking**: Percentage and duration statistics
 - **Connection History**: Visual graphs of status and latency over time
 
-### Advanced Features (Optional)
-- **HTTP Connectivity Test**: Verify web access (uses Google's generate_204)
-- **Auto-start**: Launch automatically with Windows
+### Advanced Features
 - **Manual Testing**: Force immediate connection check
 - **Statistics Dashboard**: Detailed graphs and metrics
+- **Automatic OTA Updates**: Self-updating system with forced updates after 3 postponements
+  - Checks for updates on startup and every 24 hours
+  - Downloads and installs from GitHub Releases
+  - SHA256 checksum verification
+  - Seamless restart after update
+  - 📖 See [OTA_UPDATE_SYSTEM.md](docs/OTA_UPDATE_SYSTEM.md) for details
 
 ## 🚀 Installation
 
