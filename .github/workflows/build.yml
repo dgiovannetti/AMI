@@ -9,6 +9,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:  # Permette build manuale
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     name: Build for Windows
@@ -30,15 +33,9 @@ jobs:
         pip install -r requirements-build.txt
     
     - name: Generate icons (if present)
-      run: |
-        python - <<'PY'
-        import os, runpy
-        p = 'tools/generate_icons.py'
-        if os.path.exists(p):
-            runpy.run_path(p, run_name='__main__')
-        else:
-            print('No icon generator found, skipping')
-        PY
+      run: >
+        python -c "import os,runpy; p='tools/generate_icons.py';
+        runpy.run_path(p, run_name='__main__') if os.path.exists(p) else print('No icon generator found, skipping')"
     
     - name: Build executable
       run: python build.py
