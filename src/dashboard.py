@@ -9,7 +9,9 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                             QLabel, QPushButton, QFrame, QGridLayout,
                             QGraphicsDropShadowEffect, QGraphicsOpacityEffect)
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtGui import QFont, QColor, QPixmap
+from pathlib import Path
+import sys
 import matplotlib
 matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -119,7 +121,8 @@ class EnterpriseDashboard(QMainWindow):
         # Window setup - dark compact
         self.setWindowTitle("AMI - Dashboard")
         self.setGeometry(100, 100, 950, 600)
-        self.setMinimumSize(800, 500)
+        # Allow smaller sizes and switch to compact UI automatically
+        self.setMinimumSize(280, 200)
         self.setStyleSheet("""
             QMainWindow { background-color: #0b1220; }
             QPushButton {
@@ -156,14 +159,11 @@ class EnterpriseDashboard(QMainWindow):
         """)
         top_layout = QHBoxLayout(top_bar)
 
-        # Logo area
-        logo_label = QLabel("AMI")
-        logo_font = QFont()
-        logo_font.setPointSize(24)
-        logo_font.setBold(True)
-        logo_label.setFont(logo_font)
-        logo_label.setStyleSheet("color: #e2e8f0;")
-        top_layout.addWidget(logo_label)
+        # Logo area (use resources/ami_logo.png)
+        self.logo_label = QLabel()
+        self.logo_label.setObjectName("ami_logo")
+        self._set_logo_pixmap(self.logo_label, height=28)
+        top_layout.addWidget(self.logo_label)
 
         top_layout.addStretch()
 
@@ -183,11 +183,11 @@ class EnterpriseDashboard(QMainWindow):
         main_layout.addWidget(top_bar)
 
         # === MAIN CONTENT ===
-        content_widget = QWidget()
-        content_widget.setStyleSheet("""
+        self.content_widget = QWidget()
+        self.content_widget.setStyleSheet("""
             QWidget { background-color: #0b1220; padding: 12px; }
         """)
-        content_layout = QVBoxLayout(content_widget)
+        content_layout = QVBoxLayout(self.content_widget)
         content_layout.setSpacing(12)
 
         # Title section
@@ -276,11 +276,11 @@ class EnterpriseDashboard(QMainWindow):
         content_layout.addWidget(charts_section)
 
         # === BOTTOM BAR ===
-        bottom_bar = QFrame()
-        bottom_bar.setStyleSheet("""
+        self.bottom_bar = QFrame()
+        self.bottom_bar.setStyleSheet("""
             QFrame { background-color: #0f172a; border-top: 1px solid #1f2937; padding: 10px 14px; }
         """)
-        bottom_layout = QHBoxLayout(bottom_bar)
+        bottom_layout = QHBoxLayout(self.bottom_bar)
 
         # Left - company info (from config)
         tagline = app_cfg.get('tagline', '')
@@ -312,9 +312,14 @@ class EnterpriseDashboard(QMainWindow):
 
         bottom_layout.addLayout(controls_layout)
 
-        # add content first, then bottom bar (footer)
-        main_layout.addWidget(content_widget)
-        main_layout.addWidget(bottom_bar)
+        # Compact widget (hidden by default) - logo + traffic light + ping
+        self.compact_widget = self._build_compact_widget()
+        self.compact_widget.setVisible(False)
+
+        # add content first, then compact placeholder, then bottom bar (footer)
+        main_layout.addWidget(self.content_widget)
+        main_layout.addWidget(self.compact_widget)
+        main_layout.addWidget(self.bottom_bar)
 
     def rebuild_status_grid(self, cols: int):
         # clear grid
@@ -351,6 +356,10 @@ class EnterpriseDashboard(QMainWindow):
             cols = 1
         self.rebuild_status_grid(cols)
         self.apply_scale(w / 950.0)
+        # Toggle compact mode when window is too small
+        h = self.height()
+        compact = (w < 720 or h < 420)
+        self._set_compact_mode(compact)
         super().resizeEvent(event)
 
     def update_data(self, status, statistics):
@@ -367,8 +376,17 @@ class EnterpriseDashboard(QMainWindow):
 
         if getattr(status, 'avg_latency_ms', None):
             self.card_latency.set_value(f"{status.avg_latency_ms:.0f} ms")
+            # Update compact ping
+            try:
+                self.compact_ping.setText(f"{status.avg_latency_ms:.0f} ms")
+            except Exception:
+                pass
         else:
             self.card_latency.set_value("N/A")
+            try:
+                self.compact_ping.setText("N/A")
+            except Exception:
+                pass
 
         uptime_pct = statistics.get('uptime_percentage')
         if uptime_pct is None:
@@ -382,6 +400,13 @@ class EnterpriseDashboard(QMainWindow):
         if success_pct is None and getattr(status, 'total_pings', 0) > 0:
             success_pct = (status.successful_pings / status.total_pings) * 100
         self.card_success.set_value(f"{success_pct:.1f}%" if success_pct is not None else "N/A")
+
+        # Update compact traffic light
+        try:
+            light = '🟢' if status.status == 'online' else '🟡' if status.status == 'unstable' else '🔴'
+            self.compact_light.setText(light)
+        except Exception:
+            pass
 
         self.update_graphs()
 
@@ -477,3 +502,66 @@ class EnterpriseDashboard(QMainWindow):
                 event.ignore()
                 self.hide()
         super().changeEvent(event)
+
+    # === Helper methods for compact mode and resources ===
+    def _get_resource_path(self, filename: str) -> str:
+        try:
+            base = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parents[1]
+        except Exception:
+            base = Path.cwd()
+        p = base / 'resources' / filename
+        if not p.exists():
+            p = Path('resources') / filename
+        return str(p)
+
+    def _set_logo_pixmap(self, label: QLabel, height: int = 28):
+        try:
+            path = self._get_resource_path('ami_logo.png')
+            pm = QPixmap(path)
+            if not pm.isNull():
+                label.setPixmap(pm.scaledToHeight(height, Qt.TransformationMode.SmoothTransformation))
+        except Exception:
+            pass
+
+    def _build_compact_widget(self) -> QWidget:
+        cw = QFrame()
+        cw.setStyleSheet("""
+            QFrame { background-color: #0f172a; border: none; }
+            QLabel { color: #e2e8f0; }
+        """)
+        lay = QVBoxLayout(cw)
+        lay.setContentsMargins(16, 20, 16, 16)
+        lay.setSpacing(10)
+        # Logo on top
+        self.compact_logo = QLabel()
+        self._set_logo_pixmap(self.compact_logo, height=40)
+        self.compact_logo.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        lay.addWidget(self.compact_logo)
+        # Row: traffic light + ping
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        row.setContentsMargins(0, 0, 0, 0)
+        self.compact_light = QLabel('•')
+        lf = QFont(); lf.setPointSize(28); lf.setBold(True)
+        self.compact_light.setFont(lf)
+        row.addWidget(self.compact_light)
+        self.compact_ping = QLabel('-- ms')
+        pf = QFont(); pf.setPointSize(18); pf.setBold(True)
+        self.compact_ping.setFont(pf)
+        row.addWidget(self.compact_ping)
+        row.addStretch()
+        lay.addLayout(row)
+        lay.addStretch()
+        return cw
+
+    def _set_compact_mode(self, enabled: bool):
+        # Avoid unnecessary toggles
+        if getattr(self, '_compact_mode', None) == enabled:
+            return
+        self._compact_mode = enabled
+        try:
+            self.compact_widget.setVisible(enabled)
+            self.content_widget.setVisible(not enabled)
+            self.bottom_bar.setVisible(not enabled)
+        except Exception:
+            pass

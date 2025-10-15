@@ -550,14 +550,9 @@ class SystemTrayApp:
                     message = f"Version {update_info['version']} is available!"
                     if not can_postpone:
                         message += " (Update required)"
-                    
+                    # Use notifier for cross-platform delivery (macOS AppleScript fallback)
                     try:
-                        self.tray_icon.showMessage(
-                            "AMI Update Available",
-                            message,
-                            QSystemTrayIcon.MessageIcon.Information,
-                            5000
-                        )
+                        self.notifier.notify_message("AMI Update Available", message, level='info', respect_enabled=True, play_sound=True)
                     except Exception:
                         pass
                 
@@ -568,12 +563,7 @@ class SystemTrayApp:
                 print("[UPDATE] No updates available")
                 if manual:
                     try:
-                        self.tray_icon.showMessage(
-                            "AMI",
-                            "No updates available",
-                            QSystemTrayIcon.MessageIcon.Information,
-                            2500
-                        )
+                        self.notifier.notify_message("AMI", "No updates available", level='info', respect_enabled=False, play_sound=False)
                     except Exception:
                         pass
         
@@ -581,12 +571,7 @@ class SystemTrayApp:
             print(f"[UPDATE] Error checking for updates: {e}")
             if manual:
                 try:
-                    self.tray_icon.showMessage(
-                        "AMI",
-                        f"Update check failed: {e}",
-                        QSystemTrayIcon.MessageIcon.Warning,
-                        3500
-                    )
+                    self.notifier.notify_message("AMI", f"Update check failed: {e}", level='warning', respect_enabled=False, play_sound=False)
                 except Exception:
                     pass
     

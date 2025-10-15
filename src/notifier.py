@@ -158,6 +158,41 @@ class Notifier:
                     pass
         except Exception as e:
             print(f"Error showing test notification: {e}")
+
+    def notify_message(self, title: str, message: str, level: str = 'info', respect_enabled: bool = True, play_sound: bool = False):
+        """Show a generic message (bypasses should_notify)
+        
+        Args:
+            title: Title of the notification
+            message: Body text
+            level: 'info' | 'warning' | 'error'
+            respect_enabled: if True, respects notifications.enabled; if False, always show
+            play_sound: if True and not silent_mode, play system beep
+        """
+        if respect_enabled and not self.enabled:
+            return
+        try:
+            system = platform.system()
+            if system == 'Windows' and self.windows_toast_available:
+                self._notify_windows(title, message)
+            elif system == 'Darwin':
+                self._notify_macos(title, message)
+            elif self.tray_icon is not None:
+                icon_map = {
+                    'info': QSystemTrayIcon.MessageIcon.Information,
+                    'warning': QSystemTrayIcon.MessageIcon.Warning,
+                    'error': QSystemTrayIcon.MessageIcon.Critical,
+                }
+                self.tray_icon.showMessage(title, message, icon_map.get(level, QSystemTrayIcon.MessageIcon.Information), 3500)
+            else:
+                print(f"\n[NOTIFICATION] {title}\n{message}\n")
+            if play_sound and not self.silent_mode:
+                try:
+                    QApplication.beep()
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"Error showing message notification: {e}")
     
     def _notify_macos(self, title: str, message: str):
         """Show macOS notification via AppleScript with optional sound"""
