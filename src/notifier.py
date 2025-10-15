@@ -2,11 +2,15 @@
 AMI - Active Monitor of Internet
 Notification System
 
-Handles Windows toast notifications for connection state changes
+Cross-platform notifications:
+- Windows: native toasts (windows_toasts or win10toast)
+- macOS/Linux: QSystemTrayIcon balloon via tray_icon
 """
 
 from typing import Optional
 import platform
+from PyQt6.QtWidgets import QApplication, QSystemTrayIcon
+import subprocess
 
 
 class Notifier:
@@ -40,6 +44,9 @@ class Notifier:
                     self.windows_toast_available = True
                 except ImportError:
                     print("Warning: No Windows toast notification library available")
+        
+        # Will be set by tray_app after QSystemTrayIcon is created
+        self.tray_icon = None
     
     def should_notify(self, new_status: str) -> bool:
         """
@@ -80,7 +87,7 @@ class Notifier:
         if not self.should_notify(status):
             self.last_status = status
             return
-        
+
         title = "AMI - Active Monitor of Internet"
         
         # Customize message based on status
@@ -95,15 +102,77 @@ class Notifier:
             full_message = f"{icon} Connection Lost\n{message}"
         
         try:
-            if platform.system() == 'Windows' and self.windows_toast_available:
+            system = platform.system()
+            # Prefer native Windows toast when available
+            if system == 'Windows' and self.windows_toast_available:
                 self._notify_windows(title, full_message)
+            elif system == 'Darwin':
+                # Use AppleScript notification with optional sound
+                self._notify_macos(title, full_message)
+            # Use tray balloon if tray icon is available (macOS/Linux/Windows fallback)
+            elif self.tray_icon is not None:
+                try:
+                    self.tray_icon.showMessage(
+                        title,
+                        full_message,
+                        QSystemTrayIcon.MessageIcon.Information,
+                        4000
+                    )
+                except Exception:
+                    print(f"\n[NOTIFICATION] {title}\n{full_message}\n")
             else:
-                # Fallback: print to console
                 print(f"\n[NOTIFICATION] {title}\n{full_message}\n")
+
+            # Play a simple system beep if not in silent mode
+            if not self.silent_mode:
+                try:
+                    QApplication.beep()
+                except Exception:
+                    pass
         except Exception as e:
             print(f"Error showing notification: {e}")
         
         self.last_status = status
+
+    def notify_test(self):
+        """Show a quick test notification to validate settings"""
+        if not self.enabled:
+            return
+        # Bypass should_notify to always show test
+        title = "AMI - Test Notification"
+        message = "This is a test notification from AMI."
+        try:
+            system = platform.system()
+            if system == 'Windows' and self.windows_toast_available:
+                self._notify_windows(title, message)
+            elif system == 'Darwin':
+                self._notify_macos(title, message)
+            elif self.tray_icon is not None:
+                self.tray_icon.showMessage(title, message, QSystemTrayIcon.MessageIcon.Information, 3000)
+            else:
+                print(f"\n[NOTIFICATION] {title}\n{message}\n")
+            if not self.silent_mode:
+                try:
+                    QApplication.beep()
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"Error showing test notification: {e}")
+    
+    def _notify_macos(self, title: str, message: str):
+        """Show macOS notification via AppleScript with optional sound"""
+        try:
+            # Escape quotes and newlines for AppleScript
+            esc_title = title.replace('"', '\\"')
+            esc_message = message.replace('"', '\\"').replace('\n', ' ')
+            if self.silent_mode:
+                script = f'display notification "{esc_message}" with title "{esc_title}"'
+            else:
+                # Use a built-in macOS sound
+                script = f'display notification "{esc_message}" with title "{esc_title}" sound name "Glass"'
+            subprocess.run(['osascript', '-e', script], check=False)
+        except Exception as e:
+            print(f"macOS notification error: {e}")
     
     def _notify_windows(self, title: str, message: str):
         """

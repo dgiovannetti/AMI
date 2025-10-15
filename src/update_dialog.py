@@ -128,6 +128,8 @@ class UpdateDialog(QDialog):
         self.postpone_btn.setEnabled(can_postpone)
         if not can_postpone:
             self.postpone_btn.setToolTip("Maximum postponements reached")
+            # Hide postpone button when update is mandatory
+            self.postpone_btn.setVisible(False)
         
         self.install_btn = QPushButton("🚀 Install Now")
         self.install_btn.clicked.connect(self.install_update)
@@ -258,7 +260,15 @@ class UpdateDialog(QDialog):
         self.progress_bar.setVisible(False)
     
     def closeEvent(self, event):
-        """Handle dialog close - treat as postpone if possible"""
-        if self.updater.can_postpone() and not self.download_thread:
+        """Handle dialog close - block if mandatory; otherwise treat as postpone"""
+        if not self.download_thread:
+            if not self.updater.can_postpone():
+                QMessageBox.warning(
+                    self,
+                    "Update Required",
+                    "This update is mandatory. Please install to continue."
+                )
+                event.ignore()
+                return
             self.postpone_update()
         event.accept()

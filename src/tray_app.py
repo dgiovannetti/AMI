@@ -92,11 +92,34 @@ class SystemTrayApp:
         # Create tray icon
         self.tray_icon = QSystemTrayIcon(self.app)
         self.tray_icon.setToolTip("AMI - Starting...")
+        # Attach tray icon to notifier for cross-platform notifications
+        try:
+            self.notifier.tray_icon = self.tray_icon
+        except Exception:
+            pass
         
         # Set initial icon
         self.update_icon('offline')
         
-        # Create context menu
+        # Initialize updater BEFORE creating menu so menu item is present
+        self.updater = None
+        self.update_timer = None
+        if self.config.get('updates', {}).get('enabled', True):
+            app_version = self.config.get('app', {}).get('version', '1.0.0')
+            github_repo = self.config.get('updates', {}).get('github_repo', 'dgiovannetti/AMI')
+            self.updater = UpdateManager(app_version, github_repo)
+            
+            # Check for updates on startup if configured
+            if self.config.get('updates', {}).get('check_on_startup', True):
+                QTimer.singleShot(5000, self.check_for_updates)  # Check 5s after startup
+            
+            # Set up periodic update checks
+            check_interval = self.config.get('updates', {}).get('check_interval_hours', 24)
+            self.update_timer = QTimer()
+            self.update_timer.timeout.connect(self.check_for_updates)
+            self.update_timer.start(check_interval * 3600 * 1000)  # Convert hours to ms
+
+        # Create context menu (after updater is ready)
         self.create_menu()
         
         # Double-click to show dashboard
@@ -116,24 +139,6 @@ class SystemTrayApp:
         
         # Reference to dashboard window (will be created on demand)
         self.dashboard = None
-        
-        # Initialize updater
-        self.updater = None
-        self.update_timer = None
-        if self.config.get('updates', {}).get('enabled', True):
-            app_version = self.config.get('app', {}).get('version', '1.0.0')
-            github_repo = self.config.get('updates', {}).get('github_repo', 'dgiovannetti/AMI')
-            self.updater = UpdateManager(app_version, github_repo)
-            
-            # Check for updates on startup if configured
-            if self.config.get('updates', {}).get('check_on_startup', True):
-                QTimer.singleShot(5000, self.check_for_updates)  # Check 5s after startup
-            
-            # Set up periodic update checks
-            check_interval = self.config.get('updates', {}).get('check_interval_hours', 24)
-            self.update_timer = QTimer()
-            self.update_timer.timeout.connect(self.check_for_updates)
-            self.update_timer.start(check_interval * 3600 * 1000)  # Convert hours to ms
         
         # Close splash screen with fade out (3 seconds display)
         QTimer.singleShot(3000, self.close_splash)
@@ -250,10 +255,15 @@ class SystemTrayApp:
         logs_action.triggered.connect(self.view_logs)
         menu.addAction(logs_action)
         
+        # Test Notification
+        test_notif_action = QAction("🔔 Test Notification", menu)
+        test_notif_action.triggered.connect(self.test_notification)
+        menu.addAction(test_notif_action)
+        
         # Check for updates (if enabled)
         if self.updater:
             update_action = QAction("🔄 Check for Updates", menu)
-            update_action.triggered.connect(self.check_for_updates)
+            update_action.triggered.connect(lambda: self.check_for_updates(manual=True))
             menu.addAction(update_action)
         
         menu.addSeparator()
@@ -269,6 +279,21 @@ class SystemTrayApp:
         menu.addAction(exit_action)
         
         self.tray_icon.setContextMenu(menu)
+    
+    def test_notification(self):
+        """Trigger a sample notification to validate settings"""
+        try:
+            self.notifier.notify_test()
+        except Exception:
+            try:
+                self.tray_icon.showMessage(
+                    "AMI",
+                    "Test notification",
+                    QSystemTrayIcon.MessageIcon.Information,
+                    2000
+                )
+            except Exception:
+                pass
     
     def create_icon(self, color: str) -> QIcon:
         """
