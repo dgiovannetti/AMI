@@ -271,9 +271,14 @@ For more information, see README.md
     
     print(f"\n[OK] Package created: {package_dir}")
     
-    # Create ZIP archive
+    # Create ZIP archive with platform-specific name
     try:
-        archive_name = dist_dir / 'AMI-Package'
+        if sys.platform == 'win32':
+            archive_name = dist_dir / 'AMI-Windows'
+        elif sys.platform == 'darwin':
+            archive_name = dist_dir / 'AMI-macOS'
+        else:
+            archive_name = dist_dir / 'AMI-Linux'
         shutil.make_archive(str(archive_name), 'zip', package_dir)
         print(f"[OK] ZIP archive created: {archive_name}.zip")
     except Exception as e:

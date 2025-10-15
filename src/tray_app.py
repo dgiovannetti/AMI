@@ -525,8 +525,12 @@ class SystemTrayApp:
         else:
             QMessageBox.information(None, "Logs", "No log file found yet.")
     
-    def check_for_updates(self):
-        """Check for available updates"""
+    def check_for_updates(self, manual: bool = False):
+        """Check for available updates
+        
+        Args:
+            manual: True when invoked by user from tray menu; shows toasts for results
+        """
         if not self.updater:
             return
         
@@ -542,7 +546,7 @@ class SystemTrayApp:
                 can_postpone = self.updater.can_postpone()
                 
                 # Show update notification in tray
-                if self.config.get('updates', {}).get('notify_on_update', True):
+                if manual or self.config.get('updates', {}).get('notify_on_update', True):
                     message = f"Version {update_info['version']} is available!"
                     if not can_postpone:
                         message += " (Update required)"
@@ -562,9 +566,29 @@ class SystemTrayApp:
                 dlg.exec()
             else:
                 print("[UPDATE] No updates available")
+                if manual:
+                    try:
+                        self.tray_icon.showMessage(
+                            "AMI",
+                            "No updates available",
+                            QSystemTrayIcon.MessageIcon.Information,
+                            2500
+                        )
+                    except Exception:
+                        pass
         
         except Exception as e:
             print(f"[UPDATE] Error checking for updates: {e}")
+            if manual:
+                try:
+                    self.tray_icon.showMessage(
+                        "AMI",
+                        f"Update check failed: {e}",
+                        QSystemTrayIcon.MessageIcon.Warning,
+                        3500
+                    )
+                except Exception:
+                    pass
     
     def show_about(self):
         """Show about dialog"""

@@ -29,8 +29,16 @@ jobs:
         pip install -r requirements.txt
         pip install -r requirements-build.txt
     
-    - name: Generate icons
-      run: python tools/generate_icons.py
+    - name: Generate icons (if present)
+      run: |
+        python - <<'PY'
+        import os, runpy
+        p = 'tools/generate_icons.py'
+        if os.path.exists(p):
+            runpy.run_path(p, run_name='__main__')
+        else:
+            print('No icon generator found, skipping')
+        PY
     
     - name: Build executable
       run: python build.py
@@ -39,14 +47,14 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: AMI-Windows
-        path: dist/AMI-Package.zip
+        path: dist/AMI-Windows.zip
         retention-days: 30
     
     - name: Create Release (if tag)
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        files: dist/AMI-Package.zip
+        files: dist/AMI-Windows.zip
         name: AMI ${{ github.ref_name }}
         body: |
           ## AMI - Active Monitor of Internet
@@ -54,11 +62,11 @@ jobs:
           **Version:** ${{ github.ref_name }}
           
           ### 📥 Download
-          - **Windows:** AMI-Package.zip
+          - **Windows:** AMI-Windows.zip
           
           ### 🚀 Quick Start
-          1. Scarica `AMI-Package.zip`
-          2. Estrai lo ZIP
+          1. Scarica `AMI-Windows.zip`
+          2. Estrai lo ZIP (troverai `AMI-Package/AMI.exe`)
           3. Esegui `AMI.exe`
           
           ### ✨ Features
@@ -91,8 +99,16 @@ jobs:
         pip install -r requirements.txt
         pip install -r requirements-build.txt
     
-    - name: Generate icons
-      run: python tools/generate_icons.py
+    - name: Generate icons (if present)
+      run: |
+        python - <<'PY'
+        import os, runpy
+        p = 'tools/generate_icons.py'
+        if os.path.exists(p):
+            runpy.run_path(p, run_name='__main__')
+        else:
+            print('No icon generator found, skipping')
+        PY
     
     - name: Build executable
       run: python build.py
@@ -101,14 +117,14 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: AMI-macOS
-        path: dist/AMI-Package.zip
+        path: dist/AMI-macOS.zip
         retention-days: 30
     
     - name: Create Release (if tag)
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        files: dist/AMI-Package.zip
+        files: dist/AMI-macOS.zip
         name: AMI ${{ github.ref_name }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
