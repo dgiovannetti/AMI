@@ -153,11 +153,11 @@ class EnterpriseDashboard(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
 
         # === TOP BAR ===
-        top_bar = QFrame()
-        top_bar.setStyleSheet("""
+        self.top_bar = QFrame()
+        self.top_bar.setStyleSheet("""
             QFrame { background-color: #0f172a; border-bottom: 1px solid #1f2937; padding: 10px 14px; }
         """)
-        top_layout = QHBoxLayout(top_bar)
+        top_layout = QHBoxLayout(self.top_bar)
 
         # Logo area (use resources/ami_logo.png)
         self.logo_label = QLabel()
@@ -180,7 +180,7 @@ class EnterpriseDashboard(QMainWindow):
         credits.setStyleSheet("color: #94a3b8;")
         top_layout.addWidget(credits)
 
-        main_layout.addWidget(top_bar)
+        main_layout.addWidget(self.top_bar)
 
         # === MAIN CONTENT ===
         self.content_widget = QWidget()
@@ -320,6 +320,9 @@ class EnterpriseDashboard(QMainWindow):
         main_layout.addWidget(self.content_widget)
         main_layout.addWidget(self.compact_widget)
         main_layout.addWidget(self.bottom_bar)
+        
+        # Apply initial layout logic based on current size
+        self._apply_layout_for_size()
 
     def rebuild_status_grid(self, cols: int):
         # clear grid
@@ -347,6 +350,14 @@ class EnterpriseDashboard(QMainWindow):
             pass
 
     def resizeEvent(self, event):
+        self._apply_layout_for_size()
+        super().resizeEvent(event)
+
+    def showEvent(self, event):
+        self._apply_layout_for_size()
+        super().showEvent(event)
+
+    def _apply_layout_for_size(self):
         w = self.width()
         if w >= 1100:
             cols = 4
@@ -356,11 +367,9 @@ class EnterpriseDashboard(QMainWindow):
             cols = 1
         self.rebuild_status_grid(cols)
         self.apply_scale(w / 950.0)
-        # Toggle compact mode when window is too small
         h = self.height()
         compact = (w < 720 or h < 420)
         self._set_compact_mode(compact)
-        super().resizeEvent(event)
 
     def update_data(self, status, statistics):
         """Update cards and charts"""
@@ -563,5 +572,6 @@ class EnterpriseDashboard(QMainWindow):
             self.compact_widget.setVisible(enabled)
             self.content_widget.setVisible(not enabled)
             self.bottom_bar.setVisible(not enabled)
+            self.top_bar.setVisible(not enabled)
         except Exception:
             pass
