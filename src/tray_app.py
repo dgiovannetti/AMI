@@ -231,6 +231,15 @@ class SystemTrayApp:
         self.uptime_action.setEnabled(False)
         menu.addAction(self.uptime_action)
         
+        # ISP and VPN info
+        self.isp_action = QAction("ISP: --", menu)
+        self.isp_action.setEnabled(False)
+        menu.addAction(self.isp_action)
+        
+        self.vpn_action = QAction("VPN: --", menu)
+        self.vpn_action.setEnabled(False)
+        menu.addAction(self.vpn_action)
+        
         menu.addSeparator()
         
         # Test now
@@ -400,6 +409,24 @@ class SystemTrayApp:
         uptime_pct = self.monitor.get_uptime_percentage()
         tooltip_parts.append(f"Uptime: {uptime_pct:.1f}%")
         
+        # ISP and VPN
+        try:
+            if getattr(status, 'isp', None):
+                isp_line = f"ISP: {status.isp}"
+                if getattr(status, 'public_ip', None):
+                    isp_line += f" ({status.public_ip})"
+                tooltip_parts.append(isp_line)
+            if getattr(status, 'vpn_connected', None) is not None:
+                if status.vpn_connected:
+                    vpnt = "VPN: ON"
+                    if getattr(status, 'vpn_provider', None):
+                        vpnt += f" [{status.vpn_provider}]"
+                    tooltip_parts.append(vpnt)
+                else:
+                    tooltip_parts.append("VPN: OFF")
+        except Exception:
+            pass
+        
         self.tray_icon.setToolTip("\n".join(tooltip_parts))
     
     def update_menu_info(self, status):
@@ -423,6 +450,32 @@ class SystemTrayApp:
         uptime_pct = self.monitor.get_uptime_percentage()
         uptime_dur = self.monitor.get_uptime_duration()
         self.uptime_action.setText(f"Uptime: {uptime_pct:.1f}% ({uptime_dur})")
+        
+        # ISP
+        try:
+            if getattr(status, 'isp', None):
+                isp_line = f"ISP: {status.isp}"
+                if getattr(status, 'public_ip', None):
+                    isp_line += f" ({status.public_ip})"
+                self.isp_action.setText(isp_line)
+            else:
+                self.isp_action.setText("ISP: N/A")
+        except Exception:
+            self.isp_action.setText("ISP: N/A")
+        
+        # VPN
+        try:
+            if getattr(status, 'vpn_connected', None) is True:
+                text = "VPN: ON"
+                if getattr(status, 'vpn_provider', None):
+                    text += f" [{status.vpn_provider}]"
+                self.vpn_action.setText(text)
+            elif getattr(status, 'vpn_connected', None) is False:
+                self.vpn_action.setText("VPN: OFF")
+            else:
+                self.vpn_action.setText("VPN: Unknown")
+        except Exception:
+            self.vpn_action.setText("VPN: Unknown")
     
     def check_connection(self):
         """Perform connection check in background thread"""

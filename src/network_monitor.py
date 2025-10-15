@@ -17,6 +17,8 @@ import subprocess
 from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
+import re
+import psutil
 import threading
 import requests
 
@@ -42,6 +44,10 @@ class ConnectionStatus:
     internet_ok: bool = False
     http_test_ok: bool = False
     timestamp: datetime = field(default_factory=datetime.now)
+    public_ip: Optional[str] = None
+    isp: Optional[str] = None
+    vpn_connected: Optional[bool] = None
+    vpn_provider: Optional[str] = None
 
 
 class NetworkMonitor:
@@ -70,6 +76,12 @@ class NetworkMonitor:
         # History for statistics (keep last 100 checks)
         self.status_history: List[ConnectionStatus] = []
         self.max_history = 100
+        # ISP/VPN cache
+        self._last_public_ip: Optional[str] = None
+        self._last_isp_info: Optional[Dict] = None
+        self._last_isp_check_ts: float = 0.0
+        self._last_vpn_status: Optional[Tuple[bool, str]] = None
+        self._last_vpn_check_ts: float = 0.0
         
     def ping_host(self, host: str, timeout: int = 5) -> PingResult:
         """
@@ -303,6 +315,23 @@ class NetworkMonitor:
         
         # Analyze results
         status = self.analyze_connection(ping_results, http_ok, local_ok)
+
+        # Refresh ISP info at most every 30 minutes or on IP change
+        try:
+            isp_info = self._get_public_network_info()
+            if isp_info:
+                status.public_ip = isp_info.get('ip')
+                status.isp = isp_info.get('isp')
+        except Exception:
+            pass
+
+        # Refresh VPN detection at most every 10 seconds
+        try:
+            vpn_connected, vpn_hint = self._detect_vpn(status.isp)
+            status.vpn_connected = vpn_connected
+            status.vpn_provider = vpn_hint
+        except Exception:
+            pass
         
         # Update statistics
         if status.status in ['online', 'unstable']:
@@ -315,6 +344,100 @@ class NetworkMonitor:
         
         self.last_status = status
         return status
+
+    # ===== ISP / VPN helpers =====
+    def _get_public_network_info(self) -> Optional[Dict]:
+        now = time.time()
+        # 30 minutes cache
+        if self._last_isp_info and (now - self._last_isp_check_ts) < 1800:
+            return self._last_isp_info
+        endpoints = [
+            ('https://ipinfo.io/json', lambda j: {
+                'ip': j.get('ip'),
+                'isp': j.get('org') or j.get('hostname') or j.get('org')
+            }),
+            ('https://ipapi.co/json', lambda j: {
+                'ip': j.get('ip'),
+                'isp': j.get('org') or j.get('asn_org') or j.get('org')
+            }),
+            ('https://ifconfig.co/json', lambda j: {
+                'ip': j.get('ip'),
+                'isp': j.get('asn_org') or j.get('asn')
+            }),
+        ]
+        for url, parser in endpoints:
+            try:
+                r = requests.get(url, timeout=3)
+                if r.status_code == 200:
+                    data = parser(r.json())
+                    self._last_isp_info = data
+                    self._last_public_ip = data.get('ip')
+                    self._last_isp_check_ts = now
+                    return data
+            except Exception:
+                continue
+        return self._last_isp_info
+
+    def _detect_vpn(self, isp_text: Optional[str]) -> Tuple[bool, str]:
+        now = time.time()
+        if self._last_vpn_status and (now - self._last_vpn_check_ts) < 10:
+            return self._last_vpn_status
+        hint = ''
+        # Heuristic 1: ISP/org keyword check
+        try:
+            org = (isp_text or '').lower()
+            keywords = ['vpn', 'nord', 'mullvad', 'express', 'surfshark', 'proton', 'pias', 'private internet', 'tunnelbear', 'hidemy', 'cyberghost', 'windscribe', 'ivpn']
+            for kw in keywords:
+                if kw in org:
+                    self._last_vpn_status = (True, f'org:{kw}')
+                    self._last_vpn_check_ts = now
+                    return self._last_vpn_status
+        except Exception:
+            pass
+        # Heuristic 2: OS-specific interface/process checks
+        try:
+            plat = sys.platform
+            if plat == 'darwin':
+                try:
+                    out = subprocess.check_output(['scutil', '--nc', 'list'], text=True, timeout=2)
+                    if 'Connected' in out:
+                        self._last_vpn_status = (True, 'scutil')
+                        self._last_vpn_check_ts = now
+                        return self._last_vpn_status
+                except Exception:
+                    pass
+                try:
+                    out = subprocess.check_output(['ifconfig'], text=True, timeout=2)
+                    if re.search(r'\butun\d+\b', out) or re.search(r'\bwg\d*\b', out) or 'utun' in out or 'tun' in out:
+                        self._last_vpn_status = (True, 'tun/utun')
+                        self._last_vpn_check_ts = now
+                        return self._last_vpn_status
+                except Exception:
+                    pass
+            elif plat == 'win32':
+                try:
+                    out = subprocess.check_output(['ipconfig', '/all'], text=True, timeout=3, creationflags=0)
+                    patterns = ['TAP', 'TUN', 'WireGuard', 'PPP adapter', 'NordLynx']
+                    if any(pat.lower() in out.lower() for pat in patterns):
+                        self._last_vpn_status = (True, 'adapter')
+                        self._last_vpn_check_ts = now
+                        return self._last_vpn_status
+                except Exception:
+                    pass
+            # Process scan fallback
+            try:
+                procs = [p.name().lower() for p in psutil.process_iter(attrs=['name'])]
+                for kw in ['openvpn', 'wireguard', 'wg-quick', 'nordvpn', 'tailscaled', 'tailscale', 'mullvad', 'expressvpn', 'protonvpn']:
+                    if any(kw in pn for pn in procs):
+                        self._last_vpn_status = (True, f'proc:{kw}')
+                        self._last_vpn_check_ts = now
+                        return self._last_vpn_status
+            except Exception:
+                pass
+        finally:
+            self._last_vpn_status = (False, '')
+            self._last_vpn_check_ts = now
+        return self._last_vpn_status
     
     def get_uptime_percentage(self) -> float:
         """

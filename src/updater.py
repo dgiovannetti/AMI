@@ -251,10 +251,18 @@ class UpdateManager:
         """Install update on Windows"""
         # Create batch script to replace exe and restart
         batch_script = current_exe.parent / '_update.bat'
-        
+        pid = os.getpid()
+
         batch_content = f"""@echo off
+set PID={pid}
 echo Updating AMI...
-timeout /t 2 /nobreak >nul
+REM Wait for current process to exit
+:waitpid
+tasklist /FI "PID eq %PID%" | findstr /I "%PID%" >nul
+if %errorlevel%==0 (
+  timeout /t 1 /nobreak >nul
+  goto waitpid
+)
 del /f /q "{current_exe}"
 move /y "{new_exe}" "{current_exe}"
 start "" "{current_exe}"
@@ -274,10 +282,20 @@ del "%~f0"
         """Install update on Unix/macOS"""
         # Create shell script to replace exe and restart
         script_path = current_exe.parent / '_update.sh'
-        
+        pid = os.getpid()
+
         script_content = f"""#!/bin/bash
+PID={pid}
 echo "Updating AMI..."
-sleep 2
+# Wait up to ~10s for current process to exit
+for i in $(seq 1 50); do
+  if kill -0 "$PID" 2>/dev/null; then
+    sleep 0.2
+  else
+    break
+  fi
+done
+sleep 0.2
 rm -f "{current_exe}"
 mv "{new_exe}" "{current_exe}"
 chmod +x "{current_exe}"

@@ -4,10 +4,11 @@ Shows update notification with release notes and install/postpone options
 """
 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QPushButton, QTextEdit, QProgressBar, QMessageBox)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+                             QPushButton, QTextEdit, QProgressBar, QMessageBox, QApplication)
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 from updater import UpdateManager, format_size
+import os
 
 
 class UpdateDownloadThread(QThread):
@@ -237,7 +238,15 @@ class UpdateDialog(QDialog):
                 "Update Complete",
                 "Update installed successfully. AMI will now restart."
             )
-            # App will be restarted by update script
+            # Quit the current app so only the new instance remains
+            app = QApplication.instance()
+            if app is not None:
+                app.quit()
+                # Forcefully terminate after a short delay to ensure updater script can proceed
+                QTimer.singleShot(200, lambda: os._exit(0))
+            else:
+                import sys
+                sys.exit(0)
         else:
             QMessageBox.critical(
                 self,
