@@ -261,7 +261,7 @@ class SystemTrayApp:
         menu.addAction(test_notif_action)
         
         # Check for updates (if enabled)
-        if self.updater:
+        if getattr(self, 'updater', None):
             update_action = QAction("🔄 Check for Updates", menu)
             update_action.triggered.connect(lambda: self.check_for_updates(manual=True))
             menu.addAction(update_action)
