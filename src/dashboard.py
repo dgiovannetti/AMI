@@ -353,11 +353,25 @@ class EnterpriseDashboard(QMainWindow):
 
     def apply_scale(self, scale: float):
         scale = max(0.7, min(scale, 1.15))
-        f = self.main_title.font(); f.setPointSize(int(18 * scale)); self.main_title.setFont(f)
-        f2 = self.subtitle.font(); f2.setPointSize(int(10 * scale)); self.subtitle.setFont(f2)
+        # Title scaling
+        try:
+            f = self.main_title.font()
+            f.setPointSize(int(11 * scale))
+            self.main_title.setFont(f)
+        except Exception:
+            pass
+        # Card scaling
         for card in self.status_cards:
-            vf = card.value.font(); vf.setPointSize(max(14, int(20 * scale))); card.value.setFont(vf)
-            tf = card.title.font(); tf.setPointSize(max(8, int(9 * scale))); card.title.setFont(tf)
+            try:
+                vf = card.value.font()
+                vf.setPointSize(max(16, int(20 * scale)))
+                card.value.setFont(vf)
+                tf = card.title.font()
+                tf.setPointSize(max(7, int(8 * scale)))
+                card.title.setFont(tf)
+            except Exception:
+                pass
+        # Canvas scaling
         try:
             self.canvas.setMinimumHeight(int(220 * scale))
         except Exception:
