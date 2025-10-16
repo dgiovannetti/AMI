@@ -60,59 +60,121 @@ class UpdateDialog(QDialog):
         self.init_ui()
     
     def init_ui(self):
-        """Initialize UI"""
-        self.setWindowTitle("AMI Update Available")
-        self.setMinimumWidth(500)
-        self.setMinimumHeight(400)
+        """Initialize UI - Tesla/SpaceX aesthetic"""
+        self.setWindowTitle("AMI Update")
+        self.setMinimumWidth(600)
+        self.setMinimumHeight(500)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #000000;
+            }
+            QLabel {
+                color: #ffffff;
+            }
+            QTextEdit {
+                background-color: #0a0a0a;
+                border: 1px solid #222222;
+                border-radius: 4px;
+                color: #cccccc;
+                padding: 12px;
+                font-size: 12px;
+            }
+            QProgressBar {
+                background-color: #0a0a0a;
+                border: 1px solid #222222;
+                border-radius: 4px;
+                height: 8px;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background-color: #E82127;
+                border-radius: 3px;
+            }
+        """)
         
         layout = QVBoxLayout()
-        layout.setSpacing(15)
+        layout.setSpacing(24)
+        layout.setContentsMargins(32, 32, 32, 32)
         
-        # Title
-        title = QLabel(f"🎉 AMI {self.update_info['version']} Available!")
+        # Title - bold, uppercase, Tesla style
+        title = QLabel(f"UPDATE AVAILABLE")
         title_font = QFont()
-        title_font.setPointSize(16)
+        title_font.setPointSize(20)
         title_font.setBold(True)
+        title_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2)
         title.setFont(title_font)
+        title.setStyleSheet("color: #ffffff; margin-bottom: 8px;")
         layout.addWidget(title)
         
-        # Current version info
+        # Version number - large, prominent
+        version_label = QLabel(f"Version {self.update_info['version']}")
+        version_font = QFont()
+        version_font.setPointSize(32)
+        version_font.setBold(True)
+        version_label.setFont(version_font)
+        version_label.setStyleSheet("color: #E82127; margin-bottom: 16px;")
+        layout.addWidget(version_label)
+        
+        # Current version info - minimal, clean
         current_version = self.updater.current_version
-        info_text = f"Current version: {current_version}\nNew version: {self.update_info['version']}"
+        info_text = f"Current: {current_version}"
         if 'size' in self.update_info:
-            info_text += f"\nDownload size: {format_size(self.update_info['size'])}"
+            info_text += f"  •  Size: {format_size(self.update_info['size'])}"
         
         info_label = QLabel(info_text)
-        info_label.setStyleSheet("color: #888; padding: 5px;")
+        info_font = QFont()
+        info_font.setPointSize(10)
+        info_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 0.5)
+        info_label.setFont(info_font)
+        info_label.setStyleSheet("color: #666666; margin-bottom: 16px;")
         layout.addWidget(info_label)
         
-        # Release notes
-        notes_label = QLabel("📋 What's New:")
-        notes_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
+        # Release notes header
+        notes_label = QLabel("RELEASE NOTES")
+        notes_font = QFont()
+        notes_font.setPointSize(10)
+        notes_font.setBold(True)
+        notes_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.5)
+        notes_label.setFont(notes_font)
+        notes_label.setStyleSheet("color: #666666; margin-top: 8px; margin-bottom: 8px;")
         layout.addWidget(notes_label)
         
         notes_text = QTextEdit()
         notes_text.setReadOnly(True)
         notes_text.setPlainText(self.update_info['release_notes'])
-        notes_text.setMaximumHeight(200)
+        notes_text.setMinimumHeight(180)
         layout.addWidget(notes_text)
         
-        # Postpone warning
+        # Postpone warning - Tesla red for critical
         postpone_count = self.updater.get_postpone_count()
         can_postpone = self.updater.can_postpone()
         
         if postpone_count > 0:
             remaining = self.updater.max_postponements - postpone_count
             if remaining > 0:
-                warning = QLabel(f"⚠️ You have postponed this update {postpone_count} time(s). "
-                               f"You can postpone {remaining} more time(s).")
-                warning.setStyleSheet("background-color: #fff3cd; color: #856404; "
-                                    "padding: 10px; border-radius: 5px; margin: 10px 0;")
+                warning = QLabel(f"POSTPONED {postpone_count}× • {remaining} REMAINING")
+                warning.setStyleSheet("""
+                    background-color: #1a1a00; 
+                    color: #ffcc00; 
+                    padding: 16px; 
+                    border-radius: 4px; 
+                    border-left: 4px solid #ffcc00;
+                    margin: 16px 0;
+                    font-weight: 600;
+                    letter-spacing: 1px;
+                """)
             else:
-                warning = QLabel("⛔ This update is mandatory. You cannot postpone anymore.")
-                warning.setStyleSheet("background-color: #f8d7da; color: #721c24; "
-                                    "padding: 10px; border-radius: 5px; margin: 10px 0; "
-                                    "font-weight: bold;")
+                warning = QLabel("⚠ MANDATORY UPDATE • CANNOT POSTPONE")
+                warning.setStyleSheet("""
+                    background-color: #1a0000; 
+                    color: #E82127; 
+                    padding: 16px; 
+                    border-radius: 4px; 
+                    border-left: 4px solid #E82127;
+                    margin: 16px 0; 
+                    font-weight: 700;
+                    letter-spacing: 1px;
+                """)
             layout.addWidget(warning)
         
         # Progress bar (hidden initially)
@@ -124,50 +186,57 @@ class UpdateDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        self.postpone_btn = QPushButton("⏰ Remind Me Later")
+        self.postpone_btn = QPushButton("LATER")
         self.postpone_btn.clicked.connect(self.postpone_update)
         self.postpone_btn.setEnabled(can_postpone)
         if not can_postpone:
             self.postpone_btn.setToolTip("Maximum postponements reached")
-            # Hide postpone button when update is mandatory
             self.postpone_btn.setVisible(False)
         
-        self.install_btn = QPushButton("🚀 Install Now")
+        self.install_btn = QPushButton("INSTALL UPDATE")
         self.install_btn.clicked.connect(self.install_update)
         self.install_btn.setDefault(True)
         
-        # Style buttons
-        button_style = """
+        # Tesla-style buttons
+        button_base = """
             QPushButton {
-                padding: 10px 20px;
+                padding: 16px 32px;
                 font-size: 13px;
-                border-radius: 5px;
+                font-weight: 700;
+                border-radius: 4px;
+                letter-spacing: 1.5px;
             }
         """
         
-        self.postpone_btn.setStyleSheet(button_style + """
+        self.postpone_btn.setStyleSheet(button_base + """
             QPushButton {
-                background-color: #6c757d;
-                color: white;
-                border: none;
+                background-color: #0a0a0a;
+                color: #666666;
+                border: 1px solid #222222;
             }
             QPushButton:hover {
-                background-color: #5a6268;
+                background-color: #1a1a1a;
+                color: #999999;
+                border-color: #333333;
             }
             QPushButton:disabled {
-                background-color: #e0e0e0;
-                color: #a0a0a0;
+                background-color: #000000;
+                color: #333333;
+                border-color: #111111;
             }
         """)
         
-        self.install_btn.setStyleSheet(button_style + """
+        self.install_btn.setStyleSheet(button_base + """
             QPushButton {
-                background-color: #28a745;
-                color: white;
+                background-color: #E82127;
+                color: #ffffff;
                 border: none;
             }
             QPushButton:hover {
-                background-color: #218838;
+                background-color: #ff3339;
+            }
+            QPushButton:pressed {
+                background-color: #cc1a1f;
             }
         """)
         

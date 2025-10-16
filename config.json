@@ -34,7 +34,7 @@
   "logging": {
     "enabled": true,
     "log_file": "ami_log.csv",
-    "max_log_size_mb": 10
+    "max_log_size_mb": 1
   },
   "api": {
     "enabled": false,

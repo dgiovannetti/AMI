@@ -32,6 +32,13 @@ class UpdateManager:
         self.api_url = f"https://api.github.com/repos/{github_repo}/releases/latest"
         self.postpone_file = Path.home() / '.ami_update_postponed'
         self.max_postponements = 3
+        # Optional GitHub token for private repos
+        self.token = os.environ.get('AMI_GITHUB_TOKEN') or os.environ.get('GITHUB_TOKEN')
+        self.base_headers = {
+            'Accept': 'application/vnd.github+json'
+        }
+        if self.token:
+            self.base_headers['Authorization'] = f'Bearer {self.token}'
         
     def check_for_updates(self) -> Optional[Dict]:
         """
@@ -48,7 +55,7 @@ class UpdateManager:
             }
         """
         try:
-            response = requests.get(self.api_url, timeout=10)
+            response = requests.get(self.api_url, headers=self.base_headers, timeout=10)
             response.raise_for_status()
             
             release_data = response.json()
@@ -60,9 +67,11 @@ class UpdateManager:
                 asset = self._find_platform_asset(release_data['assets'])
                 
                 if asset:
+                    # Prefer API asset URL when token is available (private repos)
+                    download_url = asset.get('url') if self.token else asset.get('browser_download_url')
                     return {
                         'version': latest_version,
-                        'download_url': asset['browser_download_url'],
+                        'download_url': download_url,
                         'release_notes': release_data.get('body', 'No release notes available'),
                         'size': asset['size'],
                         'checksum': self._extract_checksum(release_data.get('body', ''))
@@ -149,7 +158,13 @@ class UpdateManager:
             
             # Download with progress
             print(f"[UPDATE] Downloading from {download_url}...")
-            response = requests.get(download_url, stream=True, timeout=30)
+            headers = {}
+            if self.token:
+                headers['Authorization'] = f'Bearer {self.token}'
+            # If using the API asset URL, request octet-stream
+            if 'api.github.com' in download_url:
+                headers['Accept'] = 'application/octet-stream'
+            response = requests.get(download_url, headers=headers, stream=True, timeout=30)
             response.raise_for_status()
             
             total_size = int(response.headers.get('content-length', 0))

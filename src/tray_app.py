@@ -213,6 +213,12 @@ class SystemTrayApp:
         notif.notify_on_reconnect = ncfg.get('notify_on_reconnect', notif.notify_on_reconnect)
         notif.notify_on_unstable = ncfg.get('notify_on_unstable', notif.notify_on_unstable)
 
+        # Logger: reinitialize so new size/path take effect immediately
+        try:
+            self.logger = EventLogger(new_config)
+        except Exception:
+            pass
+
     
     def create_menu(self):
         """Create system tray context menu"""
@@ -306,7 +312,7 @@ class SystemTrayApp:
     
     def create_icon(self, color: str) -> QIcon:
         """
-        Create professional enterprise tray icon
+        Create minimalist Tesla-style tray icon: simple filled circle
 
         Args:
             color: Color name ('green', 'yellow', 'red')
@@ -321,52 +327,18 @@ class SystemTrayApp:
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Clean colors for enterprise
+        # Tesla-style colors: pure, bold
         if color == 'green':
-            main_color = QColor(16, 185, 129)  # Emerald-600
-            glow_color = QColor(16, 185, 129, 100)
+            main_color = QColor(52, 211, 153)  # Bright green
         elif color == 'yellow':
-            main_color = QColor(245, 158, 11)  # Amber-600
-            glow_color = QColor(245, 158, 11, 100)
+            main_color = QColor(251, 191, 36)  # Bright amber
         else:  # red
-            main_color = QColor(239, 68, 68)   # Red-600
-            glow_color = QColor(239, 68, 68, 100)
+            main_color = QColor(232, 33, 39)   # Tesla red
 
-        # Subtle glow
-        painter.setBrush(glow_color)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(16, 16, 96, 96)
-
-        # Dark background circle
-        painter.setBrush(QColor(248, 250, 252))  # Gray-50
-        painter.drawEllipse(24, 24, 80, 80)
-
-        # Main colored circle
+        # Simple filled circle - ultra minimal
         painter.setBrush(main_color)
-        painter.drawEllipse(32, 32, 64, 64)
-
-        # Highlight for depth
-        highlight_gradient = QRadialGradient(64, 48, 32)
-        highlight_gradient.setColorAt(0, QColor(255, 255, 255, 80))
-        highlight_gradient.setColorAt(1, Qt.GlobalColor.transparent)
-        painter.setBrush(highlight_gradient)
-        painter.drawEllipse(40, 40, 48, 48)
-
-        # Clean WiFi symbol
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        pen = QPen(QColor(255, 255, 255))
-        pen.setWidth(4)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(pen)
-
-        # WiFi arcs
-        painter.drawArc(48, 52, 32, 32, 0, 180 * 16)
-        painter.drawArc(40, 44, 48, 48, 0, 180 * 16)
-
-        # WiFi dot
-        painter.setBrush(QColor(255, 255, 255))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(60, 76, 8, 8)
+        painter.drawEllipse(32, 32, 64, 64)
 
         painter.end()
 

@@ -7,6 +7,7 @@ Handles event logging to CSV files with automatic rotation
 
 import csv
 import os
+import io
 from datetime import datetime
 from typing import Optional
 from pathlib import Path
@@ -21,7 +22,8 @@ class EventLogger:
     def __init__(self, config: dict):
         self.enabled = config['logging']['enabled']
         self.log_file = config['logging']['log_file']
-        self.max_size_mb = config['logging']['max_log_size_mb']
+        self.max_size_mb = config['logging'].get('max_log_size_mb', 1)
+        self.max_size_bytes = int(self.max_size_mb * 1024 * 1024)
         
         # Ensure log file exists with headers
         if self.enabled and not os.path.exists(self.log_file):
@@ -45,20 +47,28 @@ class EventLogger:
         except Exception as e:
             print(f"Error creating log file: {e}")
     
-    def _check_log_size(self):
-        """Check log file size and rotate if needed"""
+    def _check_log_size(self, next_bytes: int = 0):
+        """Check log file size and rotate if needed before appending next_bytes"""
         try:
             if os.path.exists(self.log_file):
-                size_mb = os.path.getsize(self.log_file) / (1024 * 1024)
-                
-                if size_mb > self.max_size_mb:
-                    # Rotate log file
+                size = os.path.getsize(self.log_file)
+                if size + max(0, next_bytes) > self.max_size_bytes:
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                     backup_file = f"{self.log_file}.{timestamp}.bak"
                     os.rename(self.log_file, backup_file)
                     self._create_log_file()
         except Exception as e:
             print(f"Error checking log size: {e}")
+
+    def _estimate_row_bytes(self, row) -> int:
+        try:
+            buf = io.StringIO()
+            writer = csv.writer(buf, lineterminator='\r\n')
+            writer.writerow(row)
+            data = buf.getvalue().encode('utf-8', errors='ignore')
+            return len(data)
+        except Exception:
+            return 256
     
     def log_status(self, status):
         """
@@ -71,20 +81,21 @@ class EventLogger:
             return
         
         try:
-            self._check_log_size()
-            
+            row = [
+                status.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                status.status,
+                f"{status.avg_latency_ms:.2f}" if status.avg_latency_ms else "N/A",
+                status.successful_pings,
+                status.total_pings,
+                'Yes' if status.local_network_ok else 'No',
+                'Yes' if status.internet_ok else 'No',
+                'Yes' if status.http_test_ok else 'No'
+            ]
+            est = self._estimate_row_bytes(row)
+            self._check_log_size(est)
             with open(self.log_file, 'a', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
-                writer.writerow([
-                    status.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                    status.status,
-                    f"{status.avg_latency_ms:.2f}" if status.avg_latency_ms else "N/A",
-                    status.successful_pings,
-                    status.total_pings,
-                    'Yes' if status.local_network_ok else 'No',
-                    'Yes' if status.internet_ok else 'No',
-                    'Yes' if status.http_test_ok else 'No'
-                ])
+                writer.writerow(row)
         except Exception as e:
             print(f"Error logging status: {e}")
     

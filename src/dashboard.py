@@ -7,9 +7,9 @@ Compact, legible, dark-themed dashboard with accent StatCards
 
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                             QLabel, QPushButton, QFrame, QGridLayout,
-                            QGraphicsDropShadowEffect, QGraphicsOpacityEffect)
-from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QFont, QColor, QPixmap
+                            QGraphicsDropShadowEffect, QGraphicsOpacityEffect, QGraphicsBlurEffect)
+from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QPoint, QPropertyAnimation, QParallelAnimationGroup
+from PyQt6.QtGui import QFont, QColor, QPixmap, QPainter, QLinearGradient, QPen
 from pathlib import Path
 import sys
 import matplotlib
@@ -18,20 +18,18 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 class StatCard(QFrame):
-    """Compact stat card with left accent bar and large value"""
+    """Tesla-style metric card: pure black, bold numbers, subtle glow"""
     def __init__(self, title: str, accent_color: str, initial_value: str = "--"):
         super().__init__()
         self.accent_color = accent_color
-        self.setStyleSheet(
-            """
-            QFrame {
-                background-color: rgba(15, 23, 42, 0.8);
-                border: 1px solid #334155;
-                border-radius: 8px;
-            }
-            QLabel { color: #e2e8f0; }
-            """
-        )
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: #000000;
+                border: 1px solid #1a1a1a;
+                border-radius: 4px;
+                padding: 16px 20px;
+            }}
+        """)
 
         root = QHBoxLayout(self)
         root.setContentsMargins(10, 8, 10, 8)
@@ -52,12 +50,14 @@ class StatCard(QFrame):
         col.setSpacing(2)
         col.setContentsMargins(0, 0, 0, 0)
 
+        # Title - uppercase, spaced, subtle
         self.title = QLabel(title.upper())
-        tf = QFont()
-        tf.setPointSize(9)
-        tf.setBold(True)
-        self.title.setFont(tf)
-        self.title.setStyleSheet(f"color: {self.accent_color};")
+        title_font = QFont()
+        title_font.setPointSize(8)
+        title_font.setBold(True)
+        title_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.5)
+        self.title.setFont(title_font)
+        self.title.setStyleSheet("color: #666666;")
         col.addWidget(self.title)
 
         self.value = QLabel(initial_value)
@@ -81,7 +81,6 @@ class StatCard(QFrame):
     def set_accent_color(self, color: str):
         self.accent_color = color
         self.accent.setStyleSheet(f"background-color: {color}; border-radius: 2px;")
-        self.title.setStyleSheet(f"color: {color};")
         if hasattr(self, 'glow'):
             self.glow.setColor(QColor(color))
 
@@ -119,21 +118,30 @@ class EnterpriseDashboard(QMainWindow):
         self.tray_icon = tray_icon
 
         # Window setup - dark compact
-        self.setWindowTitle("AMI - Dashboard")
-        self.setGeometry(100, 100, 950, 600)
-        # Allow smaller sizes and switch to compact UI automatically
-        self.setMinimumSize(280, 200)
+        self.setWindowTitle("AMI")
+        self.setGeometry(100, 100, 1100, 700)
+        self.setMinimumSize(900, 600)
         self.setStyleSheet("""
-            QMainWindow { background-color: #0b1220; }
-            QPushButton {
-                background-color: #1f2937;
-                color: #e5e7eb;
-                border: 1px solid #334155;
-                border-radius: 6px;
-                padding: 6px 12px;
-                font-size: 12px;
+            QMainWindow { 
+                background-color: #000000;
             }
-            QPushButton:hover { border-color: #34d399; background-color: #111827; }
+            QPushButton {
+                background-color: #0a0a0a;
+                color: #ffffff;
+                border: 1px solid #222222;
+                border-radius: 4px;
+                padding: 10px 24px;
+                font-size: 13px;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+            }
+            QPushButton:hover {
+                background-color: #1a1a1a;
+                border-color: #333333;
+            }
+            QPushButton:pressed {
+                background-color: #000000;
+            }
         """)
 
         self.setup_ui()
@@ -152,10 +160,14 @@ class EnterpriseDashboard(QMainWindow):
         main_layout.setSpacing(0)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # === TOP BAR ===
+        # === TOP BAR === Pure black, minimal
         self.top_bar = QFrame()
         self.top_bar.setStyleSheet("""
-            QFrame { background-color: #0f172a; border-bottom: 1px solid #1f2937; padding: 10px 14px; }
+            QFrame { 
+                background-color: #000000; 
+                border-bottom: 1px solid #1a1a1a; 
+                padding: 20px 32px;
+            }
         """)
         top_layout = QHBoxLayout(self.top_bar)
 
@@ -167,52 +179,45 @@ class EnterpriseDashboard(QMainWindow):
 
         top_layout.addStretch()
 
-        # Credits (from config)
+        # Minimal branding
         app_cfg = self.config.get('app', {})
-        copyright_text = app_cfg.get('copyright', '© 2025 CiaoIM™')
-        website = app_cfg.get('website', '')
-        extra_credits = app_cfg.get('credits', '')
-        top_text = " • ".join([t for t in [copyright_text, extra_credits, website] if t])
-        credits = QLabel(top_text)
-        credits_font = QFont()
-        credits_font.setPointSize(9)
-        credits.setFont(credits_font)
-        credits.setStyleSheet("color: #94a3b8;")
-        top_layout.addWidget(credits)
+        brand = QLabel("AMI")
+        brand_font = QFont()
+        brand_font.setPointSize(18)
+        brand_font.setBold(True)
+        brand_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2)
+        brand.setFont(brand_font)
+        brand.setStyleSheet("color: #ffffff;")
+        top_layout.addWidget(brand)
 
         main_layout.addWidget(self.top_bar)
 
-        # === MAIN CONTENT ===
+        # === MAIN CONTENT === Pure black canvas
         self.content_widget = QWidget()
         self.content_widget.setStyleSheet("""
-            QWidget { background-color: #0b1220; padding: 12px; }
+            QWidget { background-color: #000000; padding: 32px; }
         """)
         content_layout = QVBoxLayout(self.content_widget)
-        content_layout.setSpacing(12)
+        content_layout.setSpacing(24)
 
-        # Title section
-        title_section = QFrame()
-        title_section.setStyleSheet("""
-            QFrame { background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px; }
+        # Hero section - bold, minimal
+        hero = QFrame()
+        hero.setStyleSheet("""
+            QFrame { background-color: transparent; border: none; padding: 0; margin-bottom: 16px; }
         """)
-        title_layout = QVBoxLayout(title_section)
+        hero_layout = QVBoxLayout(hero)
+        hero_layout.setSpacing(4)
 
-        self.main_title = QLabel("AMI • Active Monitor of Internet")
-        main_title_font = QFont()
-        main_title_font.setPointSize(18)
-        main_title_font.setBold(True)
-        self.main_title.setFont(main_title_font)
-        self.main_title.setStyleSheet("color: #e2e8f0;")
-        title_layout.addWidget(self.main_title)
+        self.main_title = QLabel("INTERNET STATUS")
+        title_font = QFont()
+        title_font.setPointSize(11)
+        title_font.setBold(True)
+        title_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2)
+        self.main_title.setFont(title_font)
+        self.main_title.setStyleSheet("color: #666666;")
+        hero_layout.addWidget(self.main_title)
 
-        self.subtitle = QLabel("Sai se sei davvero online • Real-time monitoring • Notifications • Analytics")
-        subtitle_font = QFont()
-        subtitle_font.setPointSize(10)
-        self.subtitle.setFont(subtitle_font)
-        self.subtitle.setStyleSheet("color: #94a3b8; margin-top: 2px;")
-        title_layout.addWidget(self.subtitle)
-
-        content_layout.addWidget(title_section)
+        content_layout.addWidget(hero)
 
         # === STATUS GRID ===
         self.status_grid = QGridLayout()
@@ -230,19 +235,25 @@ class EnterpriseDashboard(QMainWindow):
 
         content_layout.addLayout(self.status_grid)
 
-        # === CHARTS SECTION ===
+        # Charts section - minimal container
         charts_section = QFrame()
         charts_section.setStyleSheet("""
-            QFrame { background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 8px; }
+            QFrame { 
+                background-color: #000000; 
+                border: 1px solid #1a1a1a; 
+                border-radius: 4px; 
+                padding: 24px;
+            }
         """)
         charts_layout = QVBoxLayout(charts_section)
 
-        charts_title = QLabel("Connection Analytics")
-        charts_title_font = QFont()
-        charts_title_font.setPointSize(12)
-        charts_title_font.setBold(True)
-        charts_title.setFont(charts_title_font)
-        charts_title.setStyleSheet("color: #e2e8f0;")
+        charts_title = QLabel("ANALYTICS")
+        ct_font = QFont()
+        ct_font.setPointSize(10)
+        ct_font.setBold(True)
+        ct_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.5)
+        charts_title.setFont(ct_font)
+        charts_title.setStyleSheet("color: #666666; margin-bottom: 12px;")
         charts_layout.addWidget(charts_title)
 
         # Charts area
@@ -275,18 +286,21 @@ class EnterpriseDashboard(QMainWindow):
 
         content_layout.addWidget(charts_section)
 
-        # === BOTTOM BAR ===
+        # === BOTTOM BAR === Minimal footer
         self.bottom_bar = QFrame()
         self.bottom_bar.setStyleSheet("""
-            QFrame { background-color: #0f172a; border-top: 1px solid #1f2937; padding: 10px 14px; }
+            QFrame { 
+                background-color: #000000; 
+                border-top: 1px solid #1a1a1a; 
+                padding: 16px 32px;
+            }
         """)
         bottom_layout = QHBoxLayout(self.bottom_bar)
 
-        # Left - company info (from config)
-        tagline = app_cfg.get('tagline', '')
-        bottom_text = " • ".join([t for t in [copyright_text, extra_credits, tagline] if t])
-        company_info = QLabel(bottom_text)
-        company_info.setStyleSheet("color: #94a3b8; font-size: 10px;")
+        # Minimal footer text
+        footer_text = app_cfg.get('copyright', '© 2025 CiaoIM™')
+        company_info = QLabel(footer_text)
+        company_info.setStyleSheet("color: #333333; font-size: 10px; letter-spacing: 0.5px;")
         bottom_layout.addWidget(company_info)
 
         bottom_layout.addStretch()
@@ -535,31 +549,43 @@ class EnterpriseDashboard(QMainWindow):
     def _build_compact_widget(self) -> QWidget:
         cw = QFrame()
         cw.setStyleSheet("""
-            QFrame { background-color: #0f172a; border: none; }
-            QLabel { color: #e2e8f0; }
+            QFrame { background-color: #000000; border: none; }
+            QLabel { color: #ffffff; }
         """)
         lay = QVBoxLayout(cw)
-        lay.setContentsMargins(16, 20, 16, 16)
-        lay.setSpacing(10)
-        # Logo on top
-        self.compact_logo = QLabel()
-        self._set_logo_pixmap(self.compact_logo, height=40)
-        self.compact_logo.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        lay.addWidget(self.compact_logo)
-        # Row: traffic light + ping
-        row = QHBoxLayout()
-        row.setSpacing(8)
-        row.setContentsMargins(0, 0, 0, 0)
-        self.compact_light = QLabel('•')
-        lf = QFont(); lf.setPointSize(28); lf.setBold(True)
+        lay.setContentsMargins(32, 40, 32, 32)
+        lay.setSpacing(24)
+        
+        # Brand name - minimal
+        brand = QLabel("AMI")
+        brand_font = QFont()
+        brand_font.setPointSize(24)
+        brand_font.setBold(True)
+        brand_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 3)
+        brand.setFont(brand_font)
+        brand.setStyleSheet("color: #ffffff;")
+        brand.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        lay.addWidget(brand)
+        
+        # Status indicator - huge, centered
+        self.compact_light = QLabel('●')
+        lf = QFont()
+        lf.setPointSize(64)
+        lf.setBold(True)
         self.compact_light.setFont(lf)
-        row.addWidget(self.compact_light)
+        self.compact_light.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        lay.addWidget(self.compact_light)
+        
+        # Ping - large, centered
         self.compact_ping = QLabel('-- ms')
-        pf = QFont(); pf.setPointSize(18); pf.setBold(True)
+        pf = QFont()
+        pf.setPointSize(28)
+        pf.setBold(True)
         self.compact_ping.setFont(pf)
-        row.addWidget(self.compact_ping)
-        row.addStretch()
-        lay.addLayout(row)
+        self.compact_ping.setStyleSheet("color: #666666;")
+        self.compact_ping.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        lay.addWidget(self.compact_ping)
+        
         lay.addStretch()
         return cw
 

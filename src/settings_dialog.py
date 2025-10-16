@@ -12,7 +12,7 @@ from copy import deepcopy
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLineEdit, QSpinBox, QCheckBox, QPushButton, QLabel,
-    QTabWidget, QPlainTextEdit, QComboBox, QWidget
+    QTabWidget, QPlainTextEdit, QComboBox, QWidget, QDoubleSpinBox
 )
 from PyQt6.QtCore import Qt
 
@@ -22,13 +22,90 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("AMI Settings")
         self.setModal(True)
-        self.setMinimumWidth(560)
+        self.setMinimumWidth(700)
+        self.setMinimumHeight(600)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #000000;
+            }
+            QLabel {
+                color: #ffffff;
+            }
+            QTabWidget::pane {
+                border: 1px solid #222222;
+                border-radius: 4px;
+                background-color: #000000;
+            }
+            QTabBar::tab {
+                background-color: #0a0a0a;
+                color: #666666;
+                padding: 12px 24px;
+                border: 1px solid #222222;
+                border-bottom: none;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                font-weight: 600;
+                letter-spacing: 1px;
+            }
+            QTabBar::tab:selected {
+                background-color: #000000;
+                color: #ffffff;
+                border-bottom: 2px solid #E82127;
+            }
+            QTabBar::tab:hover {
+                background-color: #1a1a1a;
+                color: #cccccc;
+            }
+            QLineEdit, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QComboBox {
+                background-color: #0a0a0a;
+                border: 1px solid #222222;
+                border-radius: 4px;
+                color: #ffffff;
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+            QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QPlainTextEdit:focus, QComboBox:focus {
+                border-color: #E82127;
+            }
+            QCheckBox {
+                color: #ffffff;
+                spacing: 8px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border: 1px solid #222222;
+                border-radius: 3px;
+                background-color: #0a0a0a;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #E82127;
+                border-color: #E82127;
+            }
+            QPushButton {
+                background-color: #0a0a0a;
+                color: #ffffff;
+                border: 1px solid #222222;
+                border-radius: 4px;
+                padding: 12px 24px;
+                font-size: 13px;
+                font-weight: 600;
+                letter-spacing: 1px;
+            }
+            QPushButton:hover {
+                background-color: #1a1a1a;
+                border-color: #333333;
+            }
+            QPushButton:pressed {
+                background-color: #000000;
+            }
+        """)
         self._original = deepcopy(config)  # keep original
         self._config = deepcopy(config)    # will be mutated
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(12, 12, 12, 12)
-        root.setSpacing(10)
+        root.setContentsMargins(24, 24, 24, 24)
+        root.setSpacing(20)
 
         self.tabs = QTabWidget()
         root.addWidget(self.tabs)
@@ -37,15 +114,34 @@ class SettingsDialog(QDialog):
         self._init_monitoring_tab()
         self._init_thresholds_tab()
         self._init_notifications_tab()
+        self._init_logging_tab()
         self._init_ui_tab()
 
-        # Buttons
+        # Buttons - Tesla style
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        self.btn_cancel = QPushButton("Cancel")
-        self.btn_save = QPushButton("Save")
+        self.btn_cancel = QPushButton("CANCEL")
+        self.btn_save = QPushButton("SAVE SETTINGS")
         self.btn_cancel.clicked.connect(self.reject)
         self.btn_save.clicked.connect(self._on_save)
+        
+        # Style save button with Tesla red
+        self.btn_save.setStyleSheet("""
+            QPushButton {
+                background-color: #E82127;
+                color: #ffffff;
+                border: none;
+                padding: 14px 32px;
+                font-weight: 700;
+            }
+            QPushButton:hover {
+                background-color: #ff3339;
+            }
+            QPushButton:pressed {
+                background-color: #cc1a1f;
+            }
+        """)
+        
         btn_row.addWidget(self.btn_cancel)
         btn_row.addWidget(self.btn_save)
         root.addLayout(btn_row)
@@ -147,6 +243,29 @@ class SettingsDialog(QDialog):
         layout.addStretch()
         self.tabs.addTab(tab, "Notifications")
 
+    def _init_logging_tab(self):
+        tab = QWidget()
+        layout = QFormLayout(tab)
+        layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+
+        log_cfg = self._config.get('logging', {})
+
+        self.log_enabled = QCheckBox("Enable logging")
+        self.log_enabled.setChecked(bool(log_cfg.get('enabled', True)))
+        layout.addRow("", self.log_enabled)
+
+        self.log_file_edit = QLineEdit(log_cfg.get('log_file', 'ami_log.csv'))
+        layout.addRow("Log file:", self.log_file_edit)
+
+        self.log_max_mb = QDoubleSpinBox()
+        self.log_max_mb.setRange(0.1, 1000.0)
+        self.log_max_mb.setDecimals(1)
+        self.log_max_mb.setSingleStep(0.1)
+        self.log_max_mb.setValue(float(log_cfg.get('max_log_size_mb', 1)))
+        layout.addRow("Max log size (MB):", self.log_max_mb)
+
+        self.tabs.addTab(tab, "Logging")
+
     def _init_ui_tab(self):
         tab = QWidget()
         form = QFormLayout(tab)
@@ -200,6 +319,12 @@ class SettingsDialog(QDialog):
         cfg['notifications']['notify_on_disconnect'] = bool(self.notif_disc.isChecked())
         cfg['notifications']['notify_on_reconnect'] = bool(self.notif_reconn.isChecked())
         cfg['notifications']['notify_on_unstable'] = bool(self.notif_unstable.isChecked())
+
+        # Logging
+        cfg.setdefault('logging', {})
+        cfg['logging']['enabled'] = bool(self.log_enabled.isChecked())
+        cfg['logging']['log_file'] = self.log_file_edit.text().strip() or 'ami_log.csv'
+        cfg['logging']['max_log_size_mb'] = float(self.log_max_mb.value())
 
         # UI
         cfg.setdefault('ui', {})
