@@ -20,84 +20,100 @@ from PyQt6.QtCore import Qt
 class SettingsDialog(QDialog):
     def __init__(self, config: Dict, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("AMI Settings")
+        self.setWindowTitle("[AMI] // CONFIG.SYS")
         self.setModal(True)
-        self.setMinimumWidth(700)
-        self.setMinimumHeight(600)
+        self.setMinimumWidth(750)
+        self.setMinimumHeight(650)
         self.setStyleSheet("""
             QDialog {
-                background-color: #000000;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0D0221, stop:1 #1a0933);
             }
             QLabel {
-                color: #ffffff;
+                color: #00F5FF;
+                font-family: 'Courier New';
             }
             QTabWidget::pane {
-                border: 1px solid #222222;
-                border-radius: 4px;
-                background-color: #000000;
+                border: 3px solid #7209B7;
+                border-radius: 0px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #0D0221, stop:1 #160633);
             }
             QTabBar::tab {
-                background-color: #0a0a0a;
-                color: #666666;
-                padding: 12px 24px;
-                border: 1px solid #222222;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #160633, stop:1 #0D0221);
+                color: #7209B7;
+                padding: 14px 28px;
+                border: 2px solid #7209B7;
                 border-bottom: none;
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-                font-weight: 600;
-                letter-spacing: 1px;
+                border-radius: 0px;
+                font-family: 'Courier New';
+                font-weight: 700;
+                letter-spacing: 2px;
             }
             QTabBar::tab:selected {
-                background-color: #000000;
-                color: #ffffff;
-                border-bottom: 2px solid #E82127;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #0D0221, stop:1 #160633);
+                color: #00F5FF;
+                border-bottom: 3px solid #00F5FF;
             }
             QTabBar::tab:hover {
-                background-color: #1a1a1a;
-                color: #cccccc;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #1a0933, stop:1 #160633);
+                color: #C77DFF;
             }
             QLineEdit, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QComboBox {
-                background-color: #0a0a0a;
-                border: 1px solid #222222;
-                border-radius: 4px;
-                color: #ffffff;
-                padding: 8px 12px;
-                font-size: 12px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #0D0221, stop:1 #160633);
+                border: 2px solid #7209B7;
+                border-radius: 0px;
+                color: #C77DFF;
+                padding: 10px 14px;
+                font-family: 'Courier New';
+                font-size: 11px;
             }
             QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QPlainTextEdit:focus, QComboBox:focus {
-                border-color: #E82127;
+                border-color: #00F5FF;
+                color: #00F5FF;
             }
             QCheckBox {
-                color: #ffffff;
-                spacing: 8px;
+                color: #C77DFF;
+                spacing: 10px;
+                font-family: 'Courier New';
             }
             QCheckBox::indicator {
-                width: 18px;
-                height: 18px;
-                border: 1px solid #222222;
-                border-radius: 3px;
-                background-color: #0a0a0a;
+                width: 20px;
+                height: 20px;
+                border: 2px solid #7209B7;
+                border-radius: 0px;
+                background: #0D0221;
             }
             QCheckBox::indicator:checked {
-                background-color: #E82127;
-                border-color: #E82127;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #00F5FF, stop:1 #00FF41);
+                border-color: #00F5FF;
             }
             QPushButton {
-                background-color: #0a0a0a;
-                color: #ffffff;
-                border: 1px solid #222222;
-                border-radius: 4px;
-                padding: 12px 24px;
-                font-size: 13px;
-                font-weight: 600;
-                letter-spacing: 1px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #160633, stop:1 #0D0221);
+                color: #7209B7;
+                border: 2px solid #7209B7;
+                border-radius: 0px;
+                padding: 14px 28px;
+                font-family: 'Courier New';
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 2px;
             }
             QPushButton:hover {
-                background-color: #1a1a1a;
-                border-color: #333333;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #1a0933, stop:1 #160633);
+                color: #9D4EDD;
+                border-color: #9D4EDD;
             }
             QPushButton:pressed {
-                background-color: #000000;
+                background: #0D0221;
+                border-color: #00F5FF;
             }
         """)
         self._original = deepcopy(config)  # keep original
@@ -117,28 +133,32 @@ class SettingsDialog(QDialog):
         self._init_logging_tab()
         self._init_ui_tab()
 
-        # Buttons - Tesla style
+        # Buttons - Cyberpunk style
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        self.btn_cancel = QPushButton("CANCEL")
-        self.btn_save = QPushButton("SAVE SETTINGS")
+        self.btn_cancel = QPushButton("[ESC] CANCEL")
+        self.btn_save = QPushButton("[ENTER] SAVE_CONFIG")
         self.btn_cancel.clicked.connect(self.reject)
         self.btn_save.clicked.connect(self._on_save)
         
-        # Style save button with Tesla red
+        # Style save button with neon cyan/green
         self.btn_save.setStyleSheet("""
             QPushButton {
-                background-color: #E82127;
-                color: #ffffff;
-                border: none;
-                padding: 14px 32px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #00F5FF, stop:1 #00FF41);
+                color: #0D0221;
+                border: 3px solid #00F5FF;
+                padding: 16px 36px;
                 font-weight: 700;
             }
             QPushButton:hover {
-                background-color: #ff3339;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #00FF41, stop:1 #00F5FF);
+                border-color: #00FF41;
+                box-shadow: 0 0 30px #00F5FF;
             }
             QPushButton:pressed {
-                background-color: #cc1a1f;
+                background: #00F5FF;
             }
         """)
         

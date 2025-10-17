@@ -60,83 +60,123 @@ class UpdateDialog(QDialog):
         self.init_ui()
     
     def init_ui(self):
-        """Initialize UI - Tesla/SpaceX aesthetic"""
-        self.setWindowTitle("AMI Update")
-        self.setMinimumWidth(600)
-        self.setMinimumHeight(500)
+        """Initialize UI - Cyberpunk aesthetic"""
+        self.setWindowTitle("[AMI] // UPDATE_AVAILABLE.EXE")
+        self.setMinimumWidth(650)
+        self.setMinimumHeight(550)
         self.setStyleSheet("""
             QDialog {
-                background-color: #000000;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0D0221, stop:1 #1a0933);
             }
             QLabel {
-                color: #ffffff;
+                color: #00F5FF;
+                font-family: 'Courier New';
             }
             QTextEdit {
-                background-color: #0a0a0a;
-                border: 1px solid #222222;
-                border-radius: 4px;
-                color: #cccccc;
-                padding: 12px;
-                font-size: 12px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #0D0221, stop:1 #160633);
+                border: 2px solid #7209B7;
+                border-radius: 0px;
+                color: #C77DFF;
+                padding: 16px;
+                font-family: 'Courier New';
+                font-size: 11px;
             }
             QProgressBar {
-                background-color: #0a0a0a;
-                border: 1px solid #222222;
-                border-radius: 4px;
-                height: 8px;
+                background: #0D0221;
+                border: 2px solid #00F5FF;
+                border-radius: 0px;
+                height: 12px;
                 text-align: center;
+                font-family: 'Courier New';
+                color: #00F5FF;
             }
             QProgressBar::chunk {
-                background-color: #E82127;
-                border-radius: 3px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #00F5FF, stop:1 #00FF41);
+                border-radius: 0px;
             }
         """)
         
         layout = QVBoxLayout()
-        layout.setSpacing(24)
-        layout.setContentsMargins(32, 32, 32, 32)
+        layout.setSpacing(28)
+        layout.setContentsMargins(40, 40, 40, 40)
         
-        # Title - bold, uppercase, Tesla style
-        title = QLabel(f"UPDATE AVAILABLE")
-        title_font = QFont()
-        title_font.setPointSize(20)
-        title_font.setBold(True)
-        title_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2)
-        title.setFont(title_font)
-        title.setStyleSheet("color: #ffffff; margin-bottom: 8px;")
-        layout.addWidget(title)
+        # Cyberpunk header with glitch effect
+        header_frame = QFrame()
+        header_frame.setStyleSheet("""
+            QFrame {
+                background: transparent;
+                border-bottom: 3px solid #00F5FF;
+                padding-bottom: 20px;
+                margin-bottom: 20px;
+            }
+        """)
+        header_layout = QVBoxLayout(header_frame)
+        header_layout.setSpacing(8)
         
-        # Version number - large, prominent
-        version_label = QLabel(f"Version {self.update_info['version']}")
-        version_font = QFont()
-        version_font.setPointSize(32)
+        # Terminal prompt
+        prompt = QLabel(">_ SYSTEM.UPDATE")
+        prompt_font = QFont("Courier New", 12)
+        prompt_font.setBold(True)
+        prompt.setFont(prompt_font)
+        prompt.setStyleSheet("color: #00FF41;")
+        header_layout.addWidget(prompt)
+        
+        # Version - huge monospace with neon
+        version_label = QLabel(f"v{self.update_info['version']}")
+        version_font = QFont("Courier New", 48)
         version_font.setBold(True)
         version_label.setFont(version_font)
-        version_label.setStyleSheet("color: #E82127; margin-bottom: 16px;")
-        layout.addWidget(version_label)
+        version_label.setStyleSheet("""
+            color: #00F5FF;
+            text-shadow: 0 0 20px #00F5FF, 2px 2px 0px #7209B7;
+        """)
+        header_layout.addWidget(version_label)
         
-        # Current version info - minimal, clean
+        layout.addWidget(header_frame)
+        
+        # Info grid - cyberpunk style
+        info_grid = QFrame()
+        info_grid.setStyleSheet("""
+            QFrame {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #0D0221, stop:1 #160633);
+                border: 2px solid #7209B7;
+                padding: 16px;
+            }
+        """)
+        info_layout = QVBoxLayout(info_grid)
+        info_layout.setSpacing(8)
+        
         current_version = self.updater.current_version
-        info_text = f"Current: {current_version}"
+        
+        # Current version
+        curr_label = QLabel(f"[CURRENT] {current_version}")
+        curr_font = QFont("Courier New", 10)
+        curr_font.setBold(True)
+        curr_label.setFont(curr_font)
+        curr_label.setStyleSheet("color: #FF006E;")
+        info_layout.addWidget(curr_label)
+        
+        # Download size
         if 'size' in self.update_info:
-            info_text += f"  •  Size: {format_size(self.update_info['size'])}"
+            size_label = QLabel(f"[SIZE] {format_size(self.update_info['size'])}")
+            size_font = QFont("Courier New", 10)
+            size_label.setFont(size_font)
+            size_label.setStyleSheet("color: #C77DFF;")
+            info_layout.addWidget(size_label)
         
-        info_label = QLabel(info_text)
-        info_font = QFont()
-        info_font.setPointSize(10)
-        info_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 0.5)
-        info_label.setFont(info_font)
-        info_label.setStyleSheet("color: #666666; margin-bottom: 16px;")
-        layout.addWidget(info_label)
+        layout.addWidget(info_grid)
         
-        # Release notes header
-        notes_label = QLabel("RELEASE NOTES")
-        notes_font = QFont()
-        notes_font.setPointSize(10)
+        # Release notes header - terminal style
+        notes_label = QLabel("// CHANGELOG.TXT")
+        notes_font = QFont("Courier New", 11)
         notes_font.setBold(True)
-        notes_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.5)
+        notes_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2)
         notes_label.setFont(notes_font)
-        notes_label.setStyleSheet("color: #666666; margin-top: 8px; margin-bottom: 8px;")
+        notes_label.setStyleSheet("color: #00F5FF; margin-top: 12px; margin-bottom: 8px;")
         layout.addWidget(notes_label)
         
         notes_text = QTextEdit()
@@ -145,35 +185,42 @@ class UpdateDialog(QDialog):
         notes_text.setMinimumHeight(180)
         layout.addWidget(notes_text)
         
-        # Postpone warning - Tesla red for critical
+        # Postpone warning - cyberpunk alert
         postpone_count = self.updater.get_postpone_count()
         can_postpone = self.updater.can_postpone()
         
         if postpone_count > 0:
             remaining = self.updater.max_postponements - postpone_count
             if remaining > 0:
-                warning = QLabel(f"POSTPONED {postpone_count}× • {remaining} REMAINING")
+                warning = QLabel(f"[!] POSTPONED: {postpone_count}x | REMAINING: {remaining}")
+                warning_font = QFont("Courier New", 11)
+                warning_font.setBold(True)
+                warning.setFont(warning_font)
                 warning.setStyleSheet("""
-                    background-color: #1a1a00; 
-                    color: #ffcc00; 
-                    padding: 16px; 
-                    border-radius: 4px; 
-                    border-left: 4px solid #ffcc00;
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #1a0933, stop:1 #0D0221);
+                    color: #FFD60A;
+                    padding: 18px;
+                    border: 2px solid #FFD60A;
+                    border-radius: 0px;
                     margin: 16px 0;
-                    font-weight: 600;
-                    letter-spacing: 1px;
+                    letter-spacing: 2px;
                 """)
             else:
-                warning = QLabel("⚠ MANDATORY UPDATE • CANNOT POSTPONE")
+                warning = QLabel("[!!!] CRITICAL: MANDATORY_UPDATE | CANNOT_POSTPONE")
+                warning_font = QFont("Courier New", 11)
+                warning_font.setBold(True)
+                warning.setFont(warning_font)
                 warning.setStyleSheet("""
-                    background-color: #1a0000; 
-                    color: #E82127; 
-                    padding: 16px; 
-                    border-radius: 4px; 
-                    border-left: 4px solid #E82127;
-                    margin: 16px 0; 
-                    font-weight: 700;
-                    letter-spacing: 1px;
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #1a0000, stop:1 #330000);
+                    color: #FF006E;
+                    padding: 18px;
+                    border: 3px solid #FF006E;
+                    border-radius: 0px;
+                    margin: 16px 0;
+                    letter-spacing: 2px;
+                    text-shadow: 0 0 10px #FF006E;
                 """)
             layout.addWidget(warning)
         
@@ -186,57 +233,65 @@ class UpdateDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        self.postpone_btn = QPushButton("LATER")
+        self.postpone_btn = QPushButton("[ESC] POSTPONE")
         self.postpone_btn.clicked.connect(self.postpone_update)
         self.postpone_btn.setEnabled(can_postpone)
         if not can_postpone:
             self.postpone_btn.setToolTip("Maximum postponements reached")
             self.postpone_btn.setVisible(False)
         
-        self.install_btn = QPushButton("INSTALL UPDATE")
+        self.install_btn = QPushButton("[ENTER] INSTALL_NOW")
         self.install_btn.clicked.connect(self.install_update)
         self.install_btn.setDefault(True)
         
-        # Tesla-style buttons
+        # Cyberpunk buttons
         button_base = """
             QPushButton {
-                padding: 16px 32px;
-                font-size: 13px;
+                padding: 18px 36px;
+                font-family: 'Courier New';
+                font-size: 12px;
                 font-weight: 700;
-                border-radius: 4px;
-                letter-spacing: 1.5px;
+                border-radius: 0px;
+                letter-spacing: 2px;
             }
         """
         
         self.postpone_btn.setStyleSheet(button_base + """
             QPushButton {
-                background-color: #0a0a0a;
-                color: #666666;
-                border: 1px solid #222222;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #160633, stop:1 #0D0221);
+                color: #7209B7;
+                border: 2px solid #7209B7;
             }
             QPushButton:hover {
-                background-color: #1a1a1a;
-                color: #999999;
-                border-color: #333333;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #1a0933, stop:1 #160633);
+                color: #9D4EDD;
+                border-color: #9D4EDD;
             }
             QPushButton:disabled {
-                background-color: #000000;
-                color: #333333;
-                border-color: #111111;
+                background: #0D0221;
+                color: #3a0d5c;
+                border-color: #3a0d5c;
             }
         """)
         
         self.install_btn.setStyleSheet(button_base + """
             QPushButton {
-                background-color: #E82127;
-                color: #ffffff;
-                border: none;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #00F5FF, stop:1 #00FF41);
+                color: #0D0221;
+                border: 3px solid #00F5FF;
             }
             QPushButton:hover {
-                background-color: #ff3339;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #00FF41, stop:1 #00F5FF);
+                border-color: #00FF41;
+                box-shadow: 0 0 30px #00F5FF;
             }
             QPushButton:pressed {
-                background-color: #cc1a1f;
+                background: #00F5FF;
+                border-color: #00F5FF;
             }
         """)
         

@@ -312,7 +312,7 @@ class SystemTrayApp:
     
     def create_icon(self, color: str) -> QIcon:
         """
-        Create minimalist Tesla-style tray icon: simple filled circle
+        Create Cyberpunk tray icon: neon ring with glow
 
         Args:
             color: Color name ('green', 'yellow', 'red')
@@ -327,18 +327,33 @@ class SystemTrayApp:
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Tesla-style colors: pure, bold
+        # Cyberpunk neon colors
         if color == 'green':
-            main_color = QColor(52, 211, 153)  # Bright green
+            main_color = QColor(0, 255, 65)  # Neon green
+            glow_color = QColor(0, 255, 65, 80)
         elif color == 'yellow':
-            main_color = QColor(251, 191, 36)  # Bright amber
+            main_color = QColor(0, 245, 255)  # Cyan
+            glow_color = QColor(0, 245, 255, 80)
         else:  # red
-            main_color = QColor(232, 33, 39)   # Tesla red
+            main_color = QColor(255, 0, 110)  # Hot pink
+            glow_color = QColor(255, 0, 110, 80)
 
-        # Simple filled circle - ultra minimal
+        # Outer glow
+        painter.setBrush(glow_color)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(16, 16, 96, 96)
+
+        # Neon ring
+        pen = QPen(main_color)
+        pen.setWidth(8)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawEllipse(36, 36, 56, 56)
+
+        # Inner dot
         painter.setBrush(main_color)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(32, 32, 64, 64)
+        painter.drawEllipse(56, 56, 16, 16)
 
         painter.end()
 

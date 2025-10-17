@@ -18,16 +18,18 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 class StatCard(QFrame):
-    """Tesla-style metric card: pure black, bold numbers, subtle glow"""
+    """Cyberpunk metric card: neon borders, glitch aesthetic, monospace"""
     def __init__(self, title: str, accent_color: str, initial_value: str = "--"):
         super().__init__()
         self.accent_color = accent_color
+        # Cyberpunk: angled corners, thick neon borders
         self.setStyleSheet(f"""
             QFrame {{
-                background-color: #000000;
-                border: 1px solid #1a1a1a;
-                border-radius: 4px;
-                padding: 16px 20px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #0D0221, stop:1 #160633);
+                border: 2px solid {accent_color};
+                border-radius: 0px;
+                padding: 20px 24px;
             }}
         """)
 
@@ -50,24 +52,23 @@ class StatCard(QFrame):
         col.setSpacing(2)
         col.setContentsMargins(0, 0, 0, 0)
 
-        # Title - uppercase, spaced, subtle
-        self.title = QLabel(title.upper())
-        title_font = QFont()
-        title_font.setPointSize(8)
+        # Title - cyberpunk style: monospace, cyan
+        self.title = QLabel(f"// {title.upper()}")
+        title_font = QFont("Courier New", 9)
         title_font.setBold(True)
-        title_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.5)
+        title_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2)
         self.title.setFont(title_font)
-        self.title.setStyleSheet("color: #666666;")
+        self.title.setStyleSheet("color: #00F5FF; text-transform: uppercase;")
         col.addWidget(self.title)
 
+        # Value - huge monospace with neon glow
         self.value = QLabel(initial_value)
-        vf = QFont()
-        vf.setPointSize(20)
+        vf = QFont("Courier New", 28)
         vf.setBold(True)
         self.value.setFont(vf)
-        self.value.setStyleSheet("color: #e2e8f0;")
+        self.value.setStyleSheet(f"color: {accent_color}; text-shadow: 0 0 10px {accent_color};")
         col.addWidget(self.value)
-        # opacity effect to flash on value updates
+        # Neon glow effect
         self.value_fx = QGraphicsOpacityEffect(self.value)
         self.value.setGraphicsEffect(self.value_fx)
         self.value_fx.setOpacity(1.0)
@@ -118,29 +119,37 @@ class EnterpriseDashboard(QMainWindow):
         self.tray_icon = tray_icon
 
         # Window setup - dark compact
-        self.setWindowTitle("AMI")
-        self.setGeometry(100, 100, 1100, 700)
+        self.setWindowTitle("AMI // NETWORK MONITOR")
+        self.setGeometry(100, 100, 1200, 750)
         self.setMinimumSize(900, 600)
+        # Cyberpunk: deep purple background with scanlines
         self.setStyleSheet("""
             QMainWindow { 
-                background-color: #000000;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0D0221, stop:1 #1a0933);
             }
             QPushButton {
-                background-color: #0a0a0a;
-                color: #ffffff;
-                border: 1px solid #222222;
-                border-radius: 4px;
-                padding: 10px 24px;
-                font-size: 13px;
-                font-weight: 600;
-                letter-spacing: 0.5px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #7209B7, stop:1 #9D4EDD);
+                color: #00F5FF;
+                border: 2px solid #00F5FF;
+                border-radius: 0px;
+                padding: 12px 28px;
+                font-family: 'Courier New';
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 2px;
+                text-transform: uppercase;
             }
             QPushButton:hover {
-                background-color: #1a1a1a;
-                border-color: #333333;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #9D4EDD, stop:1 #C77DFF);
+                border-color: #00F5FF;
+                box-shadow: 0 0 20px #00F5FF;
             }
             QPushButton:pressed {
-                background-color: #000000;
+                background: #560bad;
+                border-color: #7209B7;
             }
         """)
 
@@ -160,13 +169,14 @@ class EnterpriseDashboard(QMainWindow):
         main_layout.setSpacing(0)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # === TOP BAR === Pure black, minimal
+        # === TOP BAR === Cyberpunk header with neon accent
         self.top_bar = QFrame()
         self.top_bar.setStyleSheet("""
             QFrame { 
-                background-color: #000000; 
-                border-bottom: 1px solid #1a1a1a; 
-                padding: 20px 32px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #0D0221, stop:1 #1a0933);
+                border-bottom: 3px solid #00F5FF;
+                padding: 24px 40px;
             }
         """)
         top_layout = QHBoxLayout(self.top_bar)
@@ -179,43 +189,78 @@ class EnterpriseDashboard(QMainWindow):
 
         top_layout.addStretch()
 
-        # Minimal branding
+        # Cyberpunk branding with glitch effect
         app_cfg = self.config.get('app', {})
-        brand = QLabel("AMI")
-        brand_font = QFont()
-        brand_font.setPointSize(18)
+        brand = QLabel("[AMI]")
+        brand_font = QFont("Courier New", 22)
         brand_font.setBold(True)
-        brand_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2)
+        brand_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 4)
         brand.setFont(brand_font)
-        brand.setStyleSheet("color: #ffffff;")
+        brand.setStyleSheet("""
+            color: #00F5FF;
+            text-shadow: 2px 2px 0px #7209B7, -2px -2px 0px #C77DFF;
+        """)
         top_layout.addWidget(brand)
+        
+        # Status indicator
+        status_label = QLabel(">> ONLINE")
+        status_font = QFont("Courier New", 10)
+        status_font.setBold(True)
+        status_label.setFont(status_font)
+        status_label.setStyleSheet("color: #00FF41; margin-left: 20px;")
+        top_layout.addWidget(status_label)
 
         main_layout.addWidget(self.top_bar)
 
-        # === MAIN CONTENT === Pure black canvas
+        # === MAIN CONTENT === Cyberpunk dark canvas
         self.content_widget = QWidget()
         self.content_widget.setStyleSheet("""
-            QWidget { background-color: #000000; padding: 32px; }
+            QWidget { 
+                background: transparent;
+                padding: 40px;
+            }
         """)
         content_layout = QVBoxLayout(self.content_widget)
-        content_layout.setSpacing(24)
+        content_layout.setSpacing(32)
 
-        # Hero section - bold, minimal
+        # Hero section - cyberpunk terminal style
         hero = QFrame()
         hero.setStyleSheet("""
-            QFrame { background-color: transparent; border: none; padding: 0; margin-bottom: 16px; }
+            QFrame { 
+                background: transparent;
+                border: none;
+                padding: 0;
+                margin-bottom: 24px;
+            }
         """)
-        hero_layout = QVBoxLayout(hero)
-        hero_layout.setSpacing(4)
+        hero_layout = QHBoxLayout(hero)
+        hero_layout.setSpacing(12)
 
-        self.main_title = QLabel("INTERNET STATUS")
-        title_font = QFont()
-        title_font.setPointSize(11)
+        # Terminal prompt
+        prompt = QLabel(">_")
+        prompt_font = QFont("Courier New", 16)
+        prompt_font.setBold(True)
+        prompt.setFont(prompt_font)
+        prompt.setStyleSheet("color: #00F5FF;")
+        hero_layout.addWidget(prompt)
+        
+        self.main_title = QLabel("NETWORK_STATUS.EXE")
+        title_font = QFont("Courier New", 14)
         title_font.setBold(True)
-        title_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2)
+        title_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 3)
         self.main_title.setFont(title_font)
-        self.main_title.setStyleSheet("color: #666666;")
+        self.main_title.setStyleSheet("color: #C77DFF;")
         hero_layout.addWidget(self.main_title)
+        
+        hero_layout.addStretch()
+        
+        # Timestamp
+        import datetime
+        timestamp = QLabel(f"[{datetime.datetime.now().strftime('%H:%M:%S')}]")
+        ts_font = QFont("Courier New", 10)
+        timestamp.setFont(ts_font)
+        timestamp.setStyleSheet("color: #7209B7;")
+        hero_layout.addWidget(timestamp)
 
         content_layout.addWidget(hero)
 
@@ -224,37 +269,48 @@ class EnterpriseDashboard(QMainWindow):
         self.status_grid.setSpacing(10)
         self.status_grid.setContentsMargins(0, 0, 0, 0)
 
-        # Stat cards (dark neon)
-        self.card_status = StatCard("Connection Status", "#34d399", "--")
-        self.card_latency = StatCard("Latency", "#fbbf24", "--")
-        self.card_uptime = StatCard("Uptime", "#60a5fa", "--")
-        self.card_success = StatCard("Success Rate", "#a78bfa", "--")
+        # Stat cards - cyberpunk neon colors
+        self.card_status = StatCard("STATUS", "#00FF41", "--")
+        self.card_latency = StatCard("LATENCY", "#00F5FF", "--")
+        self.card_uptime = StatCard("UPTIME", "#C77DFF", "--")
+        self.card_success = StatCard("SUCCESS", "#FF006E", "--")
 
         self.status_cards = [self.card_status, self.card_latency, self.card_uptime, self.card_success]
         self.rebuild_status_grid(cols=4)
 
         content_layout.addLayout(self.status_grid)
 
-        # Charts section - minimal container
+        # Charts section - cyberpunk terminal window
         charts_section = QFrame()
         charts_section.setStyleSheet("""
             QFrame { 
-                background-color: #000000; 
-                border: 1px solid #1a1a1a; 
-                border-radius: 4px; 
-                padding: 24px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #0D0221, stop:1 #160633);
+                border: 3px solid #7209B7;
+                border-radius: 0px;
+                padding: 28px;
             }
         """)
         charts_layout = QVBoxLayout(charts_section)
 
-        charts_title = QLabel("ANALYTICS")
-        ct_font = QFont()
-        ct_font.setPointSize(10)
+        # Terminal-style header
+        header_row = QHBoxLayout()
+        charts_title = QLabel("// DATA_STREAM")
+        ct_font = QFont("Courier New", 11)
         ct_font.setBold(True)
-        ct_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.5)
+        ct_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2)
         charts_title.setFont(ct_font)
-        charts_title.setStyleSheet("color: #666666; margin-bottom: 12px;")
-        charts_layout.addWidget(charts_title)
+        charts_title.setStyleSheet("color: #00F5FF; margin-bottom: 16px;")
+        header_row.addWidget(charts_title)
+        header_row.addStretch()
+        
+        # Terminal buttons
+        for color in ['#FF006E', '#00FF41', '#00F5FF']:
+            dot = QLabel("●")
+            dot.setStyleSheet(f"color: {color}; font-size: 16px;")
+            header_row.addWidget(dot)
+        
+        charts_layout.addLayout(header_row)
 
         # Charts area
         self.figure = Figure(figsize=(10.5, 4.2), facecolor='#0f172a')
@@ -563,40 +619,44 @@ class EnterpriseDashboard(QMainWindow):
     def _build_compact_widget(self) -> QWidget:
         cw = QFrame()
         cw.setStyleSheet("""
-            QFrame { background-color: #000000; border: none; }
-            QLabel { color: #ffffff; }
+            QFrame { 
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0D0221, stop:1 #1a0933);
+                border: none;
+            }
+            QLabel { color: #00F5FF; }
         """)
         lay = QVBoxLayout(cw)
-        lay.setContentsMargins(32, 40, 32, 32)
-        lay.setSpacing(24)
+        lay.setContentsMargins(40, 48, 40, 40)
+        lay.setSpacing(32)
         
-        # Brand name - minimal
-        brand = QLabel("AMI")
-        brand_font = QFont()
-        brand_font.setPointSize(24)
+        # Cyberpunk brand
+        brand = QLabel("[AMI]")
+        brand_font = QFont("Courier New", 28)
         brand_font.setBold(True)
-        brand_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 3)
+        brand_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 4)
         brand.setFont(brand_font)
-        brand.setStyleSheet("color: #ffffff;")
+        brand.setStyleSheet("""
+            color: #00F5FF;
+            text-shadow: 2px 2px 0px #7209B7, -2px -2px 0px #C77DFF;
+        """)
         brand.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         lay.addWidget(brand)
         
-        # Status indicator - huge, centered
-        self.compact_light = QLabel('●')
-        lf = QFont()
-        lf.setPointSize(64)
+        # Status indicator - huge neon circle
+        self.compact_light = QLabel('◉')
+        lf = QFont("Courier New", 72)
         lf.setBold(True)
         self.compact_light.setFont(lf)
         self.compact_light.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         lay.addWidget(self.compact_light)
         
-        # Ping - large, centered
+        # Ping - monospace terminal style
         self.compact_ping = QLabel('-- ms')
-        pf = QFont()
-        pf.setPointSize(28)
+        pf = QFont("Courier New", 32)
         pf.setBold(True)
         self.compact_ping.setFont(pf)
-        self.compact_ping.setStyleSheet("color: #666666;")
+        self.compact_ping.setStyleSheet("color: #C77DFF;")
         self.compact_ping.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         lay.addWidget(self.compact_ping)
         
