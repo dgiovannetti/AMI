@@ -180,7 +180,7 @@ If you prefer manual creation:
 - **Repository**: https://github.com/dgiovannetti/AMI
 - **Releases**: https://github.com/dgiovannetti/AMI/releases
 - **Issues**: https://github.com/dgiovannetti/AMI/issues
-- **Website**: https://dgiovannetti.github.io/AMI/ (if enabled)
+- **Website**: https://ciaoim.tech/projects/ami
 
 ## 📊 Release Statistics
 

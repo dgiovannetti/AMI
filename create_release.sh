@@ -127,7 +127,7 @@ See [RELEASE_NOTES_v2.0.0.md](https://github.com/dgiovannetti/AMI/blob/main/RELE
 ---
 
 **© 2025 CiaoIM™ by Daniel Giovannetti**  
-[GitHub](https://github.com/dgiovannetti/AMI) | [Website](https://dgiovannetti.github.io/AMI/)
+[GitHub](https://github.com/dgiovannetti/AMI) | [Website](https://ciaoim.tech/projects/ami)
 EOF
 
 # Create GitHub release
