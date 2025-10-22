@@ -60,138 +60,147 @@ class UpdateDialog(QDialog):
         self.init_ui()
     
     def init_ui(self):
-        """Initialize UI - Brutalist Tech aesthetic"""
-        self.setWindowTitle("AMI Update")
-        self.setMinimumWidth(650)
-        self.setMinimumHeight(550)
+        """Initialize UI - Modern clean aesthetic"""
+        self.setWindowTitle("Software Update")
+        self.setMinimumWidth(550)
+        self.setMinimumHeight(500)
         self.setStyleSheet("""
             QDialog {
-                background-color: #F5F5F7;
+                background-color: #FFFFFF;
             }
             QLabel {
-                color: #000000;
+                color: #111827;
             }
             QTextEdit {
-                background-color: #FFFFFF;
-                border: 2px solid #000000;
-                border-radius: 0px;
-                color: #000000;
+                background-color: #F9FAFB;
+                border: 1px solid #E5E7EB;
+                border-radius: 8px;
+                color: #374151;
                 padding: 16px;
                 font-size: 13px;
+                line-height: 1.6;
             }
             QProgressBar {
-                background-color: #E8E8ED;
-                border: 2px solid #000000;
-                border-radius: 0px;
-                height: 12px;
+                background-color: #E5E7EB;
+                border: none;
+                border-radius: 6px;
+                height: 8px;
                 text-align: center;
             }
             QProgressBar::chunk {
-                background-color: #0071E3;
-                border-radius: 0px;
+                background-color: #3B82F6;
+                border-radius: 6px;
             }
         """)
         
         layout = QVBoxLayout()
-        layout.setSpacing(32)
-        layout.setContentsMargins(48, 48, 48, 48)
+        layout.setSpacing(24)
+        layout.setContentsMargins(32, 32, 32, 32)
         
-        # Title - Brutalist uppercase
-        title = QLabel("UPDATE AVAILABLE")
+        # Icon and title section
+        header = QHBoxLayout()
+        header.setSpacing(16)
+        
+        # Icon
+        icon_label = QLabel("🔄")
+        icon_font = QFont()
+        icon_font.setPointSize(32)
+        icon_label.setFont(icon_font)
+        header.addWidget(icon_label)
+        
+        # Title and version
+        title_col = QVBoxLayout()
+        title_col.setSpacing(4)
+        
+        title = QLabel("Update Available")
         title_font = QFont()
-        title_font.setPointSize(14)
-        title_font.setBold(True)
-        title_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2)
+        title_font.setPointSize(20)
+        title_font.setWeight(QFont.Weight.Bold)
         title.setFont(title_font)
-        title.setStyleSheet("color: #86868B; margin-bottom: 16px;")
-        layout.addWidget(title)
+        title.setStyleSheet("color: #111827;")
+        title_col.addWidget(title)
         
-        # Version number - ultra-light, huge
-        version_label = QLabel(f"{self.update_info['version']}")
+        version_label = QLabel(f"Version {self.update_info['version']}")
         version_font = QFont()
-        version_font.setPointSize(72)
-        version_font.setWeight(QFont.Weight.Thin)
+        version_font.setPointSize(14)
+        version_font.setWeight(QFont.Weight.Medium)
         version_label.setFont(version_font)
-        version_label.setStyleSheet("color: #0071E3; margin-bottom: 24px;")
-        layout.addWidget(version_label)
+        version_label.setStyleSheet("color: #3B82F6;")
+        title_col.addWidget(version_label)
         
-        # Current version info - clean
+        header.addLayout(title_col)
+        header.addStretch()
+        layout.addLayout(header)
+        
+        # Info section
+        info_frame = QFrame()
+        info_frame.setStyleSheet("""
+            QFrame {
+                background-color: #F9FAFB;
+                border: 1px solid #E5E7EB;
+                border-radius: 8px;
+                padding: 16px;
+            }
+        """)
+        info_layout = QVBoxLayout(info_frame)
+        info_layout.setSpacing(8)
+        
         current_version = self.updater.current_version
-        info_text = f"CURRENT VERSION: {current_version}"
-        if 'size' in self.update_info:
-            info_text += f"  •  DOWNLOAD SIZE: {format_size(self.update_info['size'])}"
+        current_label = QLabel(f"Current version: {current_version}")
+        current_label.setStyleSheet("color: #6B7280; font-size: 13px;")
+        info_layout.addWidget(current_label)
         
-        info_label = QLabel(info_text)
-        info_font = QFont()
-        info_font.setPointSize(11)
-        info_font.setBold(True)
-        info_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.5)
-        info_label.setFont(info_font)
-        info_label.setStyleSheet("color: #86868B; margin-bottom: 24px;")
-        layout.addWidget(info_label)
+        if 'size' in self.update_info:
+            size_label = QLabel(f"Download size: {format_size(self.update_info['size'])}")
+            size_label.setStyleSheet("color: #6B7280; font-size: 13px;")
+            info_layout.addWidget(size_label)
+        
+        layout.addWidget(info_frame)
         
         # Release notes header
-        notes_label = QLabel("RELEASE NOTES")
+        notes_label = QLabel("What's New")
         notes_font = QFont()
-        notes_font.setPointSize(12)
-        notes_font.setBold(True)
-        notes_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2)
+        notes_font.setPointSize(14)
+        notes_font.setWeight(QFont.Weight.Bold)
         notes_label.setFont(notes_font)
-        notes_label.setStyleSheet("color: #000000; margin-top: 8px; margin-bottom: 12px;")
+        notes_label.setStyleSheet("color: #111827; margin-top: 8px;")
         layout.addWidget(notes_label)
         
         notes_text = QTextEdit()
         notes_text.setReadOnly(True)
         notes_text.setPlainText(self.update_info['release_notes'])
-        notes_text.setMinimumHeight(200)
-        # Hard shadow
-        from PyQt6.QtWidgets import QGraphicsDropShadowEffect
-        from PyQt6.QtGui import QColor
-        notes_shadow = QGraphicsDropShadowEffect()
-        notes_shadow.setColor(QColor(0, 0, 0, 255))
-        notes_shadow.setBlurRadius(0)
-        notes_shadow.setOffset(6, 6)
-        notes_text.setGraphicsEffect(notes_shadow)
+        notes_text.setMinimumHeight(150)
+        notes_text.setMaximumHeight(200)
         layout.addWidget(notes_text)
         
-        # Postpone warning - Brutalist style
+        # Postpone warning - modern style
         postpone_count = self.updater.get_postpone_count()
         can_postpone = self.updater.can_postpone()
         
         if postpone_count > 0:
             remaining = self.updater.max_postponements - postpone_count
             if remaining > 0:
-                warning = QLabel(f"POSTPONED {postpone_count}× • {remaining} REMAINING")
+                warning = QLabel(f"⚠️ Postponed {postpone_count} time(s). {remaining} remaining.")
                 warning.setStyleSheet("""
-                    background-color: #FFFFFF; 
-                    color: #FF9500; 
-                    padding: 20px; 
-                    border: 3px solid #000000;
-                    border-left: 6px solid #FF9500;
-                    margin: 16px 0;
-                    font-weight: 700;
-                    letter-spacing: 2px;
+                    background-color: #FEF3C7; 
+                    color: #92400E; 
+                    padding: 12px 16px; 
+                    border: 1px solid #FCD34D;
+                    border-radius: 8px;
+                    font-size: 13px;
+                    font-weight: 500;
                 """)
             else:
-                warning = QLabel("⚠ MANDATORY UPDATE • CANNOT POSTPONE")
+                warning = QLabel("⚠️ This update is mandatory and cannot be postponed.")
                 warning.setStyleSheet("""
-                    background-color: #FFFFFF; 
-                    color: #FF3B30; 
-                    padding: 20px; 
-                    border: 3px solid #000000;
-                    border-left: 6px solid #FF3B30;
-                    margin: 16px 0; 
-                    font-weight: 700;
-                    letter-spacing: 2px;
+                    background-color: #FEE2E2; 
+                    color: #991B1B; 
+                    padding: 12px 16px; 
+                    border: 1px solid #FCA5A5;
+                    border-radius: 8px;
+                    font-size: 13px;
+                    font-weight: 500;
                 """)
-            # Hard shadow on warning
-            from PyQt6.QtWidgets import QGraphicsDropShadowEffect
-            from PyQt6.QtGui import QColor
-            warn_shadow = QGraphicsDropShadowEffect()
-            warn_shadow.setColor(QColor(0, 0, 0, 255))
-            warn_shadow.setBlurRadius(0)
-            warn_shadow.setOffset(6, 6)
-            warning.setGraphicsEffect(warn_shadow)
             layout.addWidget(warning)
         
         # Progress bar (hidden initially)
@@ -203,72 +212,54 @@ class UpdateDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        self.postpone_btn = QPushButton("LATER")
+        self.postpone_btn = QPushButton("Remind Me Later")
         self.postpone_btn.clicked.connect(self.postpone_update)
         self.postpone_btn.setEnabled(can_postpone)
         if not can_postpone:
             self.postpone_btn.setToolTip("Maximum postponements reached")
             self.postpone_btn.setVisible(False)
         
-        self.install_btn = QPushButton("INSTALL UPDATE")
+        self.install_btn = QPushButton("Install Update")
         self.install_btn.clicked.connect(self.install_update)
         self.install_btn.setDefault(True)
         
-        # Brutalist buttons with hard shadows
-        button_base = """
+        # Modern button styles
+        self.postpone_btn.setStyleSheet("""
             QPushButton {
-                padding: 16px 40px;
+                background-color: #F3F4F6;
+                color: #374151;
+                border: 1px solid #D1D5DB;
+                border-radius: 8px;
+                padding: 10px 24px;
                 font-size: 13px;
-                font-weight: 700;
-                border-radius: 2px;
-                letter-spacing: 2px;
-            }
-        """
-        
-        self.postpone_btn.setStyleSheet(button_base + """
-            QPushButton {
-                background-color: #FFFFFF;
-                color: #000000;
-                border: 3px solid #000000;
+                font-weight: 600;
             }
             QPushButton:hover {
-                background-color: #E8E8ED;
+                background-color: #E5E7EB;
             }
             QPushButton:disabled {
-                background-color: #F5F5F7;
-                color: #C7C7CC;
-                border-color: #C7C7CC;
+                background-color: #F9FAFB;
+                color: #9CA3AF;
             }
         """)
         
-        self.install_btn.setStyleSheet(button_base + """
+        self.install_btn.setStyleSheet("""
             QPushButton {
-                background-color: #0071E3;
+                background-color: #3B82F6;
                 color: #FFFFFF;
-                border: 3px solid #000000;
+                border: none;
+                border-radius: 8px;
+                padding: 10px 24px;
+                font-size: 13px;
+                font-weight: 600;
             }
             QPushButton:hover {
-                background-color: #0077ED;
+                background-color: #2563EB;
             }
             QPushButton:pressed {
-                background-color: #0051A3;
+                background-color: #1D4ED8;
             }
         """)
-        
-        # Hard shadows on buttons
-        from PyQt6.QtWidgets import QGraphicsDropShadowEffect
-        from PyQt6.QtGui import QColor
-        postpone_shadow = QGraphicsDropShadowEffect()
-        postpone_shadow.setColor(QColor(0, 0, 0, 255))
-        postpone_shadow.setBlurRadius(0)
-        postpone_shadow.setOffset(4, 4)
-        self.postpone_btn.setGraphicsEffect(postpone_shadow)
-        
-        install_shadow = QGraphicsDropShadowEffect()
-        install_shadow.setColor(QColor(0, 0, 0, 255))
-        install_shadow.setBlurRadius(0)
-        install_shadow.setOffset(4, 4)
-        self.install_btn.setGraphicsEffect(install_shadow)
         
         button_layout.addWidget(self.postpone_btn)
         button_layout.addWidget(self.install_btn)

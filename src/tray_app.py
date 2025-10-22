@@ -312,7 +312,7 @@ class SystemTrayApp:
     
     def create_icon(self, color: str) -> QIcon:
         """
-        Create Brutalist tray icon: filled circle with thick black border
+        Create modern tray icon: simple filled circle
 
         Args:
             color: Color name ('green', 'yellow', 'red')
@@ -327,19 +327,17 @@ class SystemTrayApp:
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Brutalist colors: Apple-inspired
+        # Modern colors
         if color == 'green':
-            main_color = QColor(52, 199, 89)  # Apple Green
+            main_color = QColor(16, 185, 129)  # Green-500
         elif color == 'yellow':
-            main_color = QColor(255, 149, 0)  # Apple Orange
+            main_color = QColor(245, 158, 11)  # Amber-500
         else:  # red
-            main_color = QColor(255, 59, 48)   # Apple Red
+            main_color = QColor(239, 68, 68)   # Red-500
 
-        # Filled circle with thick border
+        # Simple filled circle
         painter.setBrush(main_color)
-        pen = QPen(QColor(0, 0, 0))
-        pen.setWidth(6)
-        painter.setPen(pen)
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(32, 32, 64, 64)
 
         painter.end()

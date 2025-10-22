@@ -22,90 +22,88 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("AMI Settings")
         self.setModal(True)
-        self.setMinimumWidth(700)
-        self.setMinimumHeight(600)
+        self.setMinimumWidth(650)
+        self.setMinimumHeight(550)
         self.setStyleSheet("""
             QDialog {
-                background-color: #F5F5F7;
+                background-color: #FFFFFF;
             }
             QLabel {
-                color: #000000;
+                color: #111827;
             }
             QTabWidget::pane {
-                border: 3px solid #000000;
-                border-radius: 0px;
+                border: 1px solid #E5E7EB;
+                border-radius: 8px;
                 background-color: #FFFFFF;
-                padding: 24px;
+                padding: 20px;
             }
             QTabBar::tab {
                 background-color: transparent;
-                color: #86868B;
-                padding: 14px 28px;
+                color: #6B7280;
+                padding: 10px 20px;
                 border: none;
                 border-bottom: 2px solid transparent;
-                font-weight: 700;
-                letter-spacing: 2px;
-                font-size: 12px;
+                font-weight: 600;
+                font-size: 13px;
             }
             QTabBar::tab:selected {
                 background-color: transparent;
-                color: #000000;
-                border-bottom: 4px solid #0071E3;
+                color: #111827;
+                border-bottom: 2px solid #3B82F6;
             }
             QTabBar::tab:hover {
-                background-color: transparent;
-                color: #000000;
+                color: #374151;
             }
             QLineEdit, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QComboBox {
                 background-color: #FFFFFF;
-                border: 2px solid #000000;
-                border-radius: 0px;
-                color: #000000;
-                padding: 10px 14px;
+                border: 1px solid #D1D5DB;
+                border-radius: 6px;
+                color: #111827;
+                padding: 8px 12px;
                 font-size: 13px;
             }
             QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QPlainTextEdit:focus, QComboBox:focus {
-                border-left: 4px solid #0071E3;
+                border-color: #3B82F6;
+                outline: none;
             }
             QCheckBox {
-                color: #000000;
-                spacing: 10px;
-                font-weight: 500;
+                color: #374151;
+                spacing: 8px;
+                font-size: 13px;
             }
             QCheckBox::indicator {
-                width: 20px;
-                height: 20px;
-                border: 2px solid #000000;
-                border-radius: 0px;
+                width: 18px;
+                height: 18px;
+                border: 1px solid #D1D5DB;
+                border-radius: 4px;
                 background-color: #FFFFFF;
             }
             QCheckBox::indicator:checked {
-                background-color: #0071E3;
-                border-color: #000000;
+                background-color: #3B82F6;
+                border-color: #3B82F6;
             }
             QPushButton {
-                background-color: #FFFFFF;
-                color: #000000;
-                border: 3px solid #000000;
-                border-radius: 2px;
-                padding: 14px 28px;
+                background-color: #F3F4F6;
+                color: #374151;
+                border: 1px solid #D1D5DB;
+                border-radius: 8px;
+                padding: 10px 20px;
                 font-size: 13px;
-                font-weight: 700;
-                letter-spacing: 2px;
+                font-weight: 600;
             }
             QPushButton:hover {
-                background-color: #E8E8ED;
+                background-color: #E5E7EB;
             }
             QPushButton:pressed {
-                background-color: #D1D1D6;
+                background-color: #D1D5DB;
             }
         """)
         self._original = deepcopy(config)  # keep original
         self._config = deepcopy(config)    # will be mutated
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(24, 24, 24, 24)
-        root.setSpacing(20)
+        root.setContentsMargins(20, 20, 20, 20)
+        root.setSpacing(16)
 
         self.tabs = QTabWidget()
         root.addWidget(self.tabs)
@@ -117,40 +115,29 @@ class SettingsDialog(QDialog):
         self._init_logging_tab()
         self._init_ui_tab()
 
-        # Buttons - Tesla style
+        # Buttons - modern style
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        self.btn_cancel = QPushButton("CANCEL")
-        self.btn_save = QPushButton("SAVE SETTINGS")
+        self.btn_cancel = QPushButton("Cancel")
+        self.btn_save = QPushButton("Save Settings")
         self.btn_cancel.clicked.connect(self.reject)
         self.btn_save.clicked.connect(self._on_save)
         
-        # Style save button with electric blue
+        # Style save button
         self.btn_save.setStyleSheet("""
             QPushButton {
-                background-color: #0071E3;
+                background-color: #3B82F6;
                 color: #FFFFFF;
-                border: 3px solid #000000;
-                padding: 14px 32px;
-                font-weight: 700;
-                letter-spacing: 2px;
+                border: none;
+                padding: 10px 24px;
             }
             QPushButton:hover {
-                background-color: #0077ED;
+                background-color: #2563EB;
             }
             QPushButton:pressed {
-                background-color: #0051A3;
+                background-color: #1D4ED8;
             }
         """)
-        
-        # Hard shadows on buttons
-        from PyQt6.QtWidgets import QGraphicsDropShadowEffect
-        from PyQt6.QtGui import QColor
-        save_shadow = QGraphicsDropShadowEffect()
-        save_shadow.setColor(QColor(0, 0, 0, 255))
-        save_shadow.setBlurRadius(0)
-        save_shadow.setOffset(4, 4)
-        self.btn_save.setGraphicsEffect(save_shadow)
         
         btn_row.addWidget(self.btn_cancel)
         btn_row.addWidget(self.btn_save)
