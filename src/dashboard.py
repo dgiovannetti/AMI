@@ -384,12 +384,13 @@ class EnterpriseDashboard(QMainWindow):
 
     def update_data(self, status, statistics):
         """Update cards and charts"""
+        # Accessible status indicators: color + symbol
         status_map = {
-            'online': (' Online', '#34d399'),
-            'unstable': (' Unstable', '#fbbf24'),
-            'offline': (' Offline', '#ef4444')
+            'online': ('✓ Online', '#34d399'),
+            'unstable': ('! Unstable', '#fbbf24'),
+            'offline': ('✕ Offline', '#ef4444')
         }
-        st_text, st_color = status_map.get(status.status, (' Unknown', '#94a3b8'))
+        st_text, st_color = status_map.get(status.status, ('? Unknown', '#94a3b8'))
         self.card_status.set_value(st_text)
         self.card_status.set_accent_color(st_color)
         self.card_status.pulse()
@@ -421,10 +422,21 @@ class EnterpriseDashboard(QMainWindow):
             success_pct = (status.successful_pings / status.total_pings) * 100
         self.card_success.set_value(f"{success_pct:.1f}%" if success_pct is not None else "N/A")
 
-        # Update compact traffic light
+        # Update compact traffic light with accessible symbols
         try:
-            light = ' ' if status.status == 'online' else ' ' if status.status == 'unstable' else ' '
+            # Use symbols that are distinguishable even without color
+            if status.status == 'online':
+                light = '✓'  # Checkmark
+                color = '#34d399'
+            elif status.status == 'unstable':
+                light = '!'  # Exclamation
+                color = '#fbbf24'
+            else:  # offline
+                light = '✕'  # X mark
+                color = '#ef4444'
+            
             self.compact_light.setText(light)
+            self.compact_light.setStyleSheet(f"color: {color};")
         except Exception:
             pass
 

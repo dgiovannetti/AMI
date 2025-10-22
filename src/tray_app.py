@@ -312,13 +312,13 @@ class SystemTrayApp:
     
     def create_icon(self, color: str) -> QIcon:
         """
-        Create modern tray icon: simple filled circle
+        Create accessible tray icon: color + symbol for colorblind users
 
         Args:
             color: Color name ('green', 'yellow', 'red')
 
         Returns:
-            QIcon object
+            QIcon object with both color and symbol indicators
         """
         # Create 128x128 for high DPI
         pixmap = QPixmap(128, 128)
@@ -327,18 +327,29 @@ class SystemTrayApp:
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Modern colors
+        # Modern colors + symbols for accessibility
         if color == 'green':
             main_color = QColor(16, 185, 129)  # Green-500
+            symbol = '✓'  # Checkmark for online
         elif color == 'yellow':
             main_color = QColor(245, 158, 11)  # Amber-500
+            symbol = '!'  # Exclamation for unstable
         else:  # red
             main_color = QColor(239, 68, 68)   # Red-500
+            symbol = '✕'  # X for offline
 
-        # Simple filled circle
+        # Filled circle background
         painter.setBrush(main_color)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(32, 32, 64, 64)
+
+        # Add white symbol on top for accessibility
+        painter.setPen(QColor(255, 255, 255))
+        font = painter.font()
+        font.setPointSize(48)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.drawText(32, 32, 64, 64, Qt.AlignmentFlag.AlignCenter, symbol)
 
         painter.end()
 
