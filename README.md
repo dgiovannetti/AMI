@@ -13,7 +13,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/version-2.0.0-brightgreen" alt="Version"/>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-blue" alt="Platform"/>
-  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License"/>
+  <img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"/>
   <img src="https://img.shields.io/badge/status-public-success" alt="Status"/>
   <img src="https://img.shields.io/badge/accessibility-WCAG%202.1-purple" alt="Accessibility"/>
 </p>
@@ -347,9 +347,39 @@ Supported conditions:
 
 ## 📝 License
 
-This project is **open source** and available under the MIT License.
+This project is **open source** and available under the **Apache License 2.0**.
 
 **Now Public!** AMI is freely available for personal and commercial use.
+
+### Commercial Use Requirements
+
+If you use AMI or derivative works in a **commercial product or service**, you **MUST**:
+
+1. **Include attribution** in your product:
+   ```
+   Powered by AMI (Active Monitor of Internet) by CiaoIM™
+   Developed by Daniel Giovannetti
+   https://github.com/dgiovannetti/AMI
+   ```
+
+2. **Display attribution** in one of:
+   - About dialog/page
+   - Credits section
+   - Help documentation
+   - Application footer (for web apps)
+
+3. **Keep it visible**: Attribution must be clearly readable and include the link to the original repository.
+
+See the [NOTICE](NOTICE) file for complete attribution requirements and examples.
+
+### Why Apache 2.0?
+
+Apache 2.0 was chosen over MIT because it:
+- ✅ **Requires attribution** for commercial use (protects creator recognition)
+- ✅ **Grants patent rights** (protects users from patent litigation)
+- ✅ **Allows commercial use** (business-friendly)
+- ✅ **Permits modification** (fork-friendly)
+- ✅ **Industry standard** (used by Android, Kubernetes, Apache projects)
 
 ## 🤝 Contributing
 

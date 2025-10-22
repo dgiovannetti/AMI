@@ -1,0 +1,87 @@
+AMI - Active Monitor of Internet
+Copyright 2025 CiaoIM™ by Daniel Giovannetti
+
+This product includes software developed by CiaoIM™ (https://github.com/dgiovannetti/AMI)
+
+================================================================================
+
+ATTRIBUTION REQUIREMENTS FOR COMMERCIAL USE
+================================================================================
+
+If you use AMI or derivative works in a commercial product or service, you MUST:
+
+1. Include the following attribution in your product documentation, about page,
+   or credits section:
+
+   "Powered by AMI (Active Monitor of Internet) by CiaoIM™
+    Developed by Daniel Giovannetti
+    https://github.com/dgiovannetti/AMI"
+
+2. If your product has a user interface, include the attribution in one of:
+   - About dialog/page
+   - Credits section
+   - Help documentation
+   - Application footer (for web applications)
+
+3. The attribution must be:
+   - Clearly visible and readable
+   - Not hidden or obscured
+   - Include the link to the original repository
+   - Mention both "CiaoIM™" and "Daniel Giovannetti"
+
+4. For white-label or rebranded products, you may add your own branding
+   alongside the required attribution, but you cannot remove or hide the
+   original attribution.
+
+================================================================================
+
+ACCEPTABLE ATTRIBUTION EXAMPLES
+================================================================================
+
+Minimal (text-only):
+  "Network monitoring powered by AMI by CiaoIM™ (Daniel Giovannetti)"
+
+Standard (with link):
+  "Built with AMI - Active Monitor of Internet
+   © 2025 CiaoIM™ by Daniel Giovannetti
+   https://github.com/dgiovannetti/AMI"
+
+Full (recommended):
+  "This product uses AMI (Active Monitor of Internet), an open-source
+   network monitoring tool developed by Daniel Giovannetti under the
+   CiaoIM™ brand. Learn more at https://github.com/dgiovannetti/AMI"
+
+================================================================================
+
+THIRD-PARTY COMPONENTS
+================================================================================
+
+This software includes the following third-party components:
+
+PyQt6
+  Copyright (c) Riverbank Computing Limited
+  License: GPL v3 / Commercial
+  https://www.riverbankcomputing.com/software/pyqt/
+
+matplotlib
+  Copyright (c) 2012-2023 Matplotlib Development Team
+  License: PSF-based (BSD-compatible)
+  https://matplotlib.org/
+
+requests
+  Copyright (c) Kenneth Reitz
+  License: Apache 2.0
+  https://requests.readthedocs.io/
+
+ping3
+  Copyright (c) kyan001
+  License: MIT
+  https://github.com/kyan001/ping3
+
+================================================================================
+
+For questions about licensing or commercial use, please contact:
+  GitHub: https://github.com/dgiovannetti/AMI/issues
+  Repository: https://github.com/dgiovannetti/AMI
+
+================================================================================
