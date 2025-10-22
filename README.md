@@ -11,29 +11,38 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-brightgreen" alt="Version"/>
+  <img src="https://img.shields.io/badge/version-2.0.0-brightgreen" alt="Version"/>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-blue" alt="Platform"/>
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License"/>
+  <img src="https://img.shields.io/badge/status-public-success" alt="Status"/>
+  <img src="https://img.shields.io/badge/accessibility-WCAG%202.1-purple" alt="Accessibility"/>
 </p>
 
 ---
 
-## 🎨 **NEW!** Modern Design
+## 🎨 **NEW!** Modern Design & Accessibility
 
-AMI features a **completely redesigned UI** with:
-- ✨ **Elegant splash screen** with animations
-- 🌑 **Dark modern dashboard** with professional theme
-- 📊 **Beautiful graphs** with dark theme integration
-- 🎯 **Icon-rich interface** for instant recognition
-- 🏆 **Professional branding** throughout
+AMI features a **completely redesigned UI** inspired by Stripe, Vercel, and modern web dashboards:
 
-👉 See [WHATS_NEW.md](WHATS_NEW.md) for details | [DESIGN_SHOWCASE.md](DESIGN_SHOWCASE.md) for design guide
+### Design Highlights
+- ✨ **Clean, professional interface** with subtle shadows and rounded corners
+- 🎨 **Light, modern theme** with Tailwind-inspired color palette
+- 📊 **Beautiful real-time graphs** with smooth animations
+- 🎯 **Intuitive layout** with proper spacing and typography
+- 💎 **Polished components** - cards, buttons, dialogs, settings
+
+### Accessibility Features ♿
+- ✓ **Colorblind-friendly** - Status indicators use both color AND symbols (✓, !, ✕)
+- 🔍 **High-contrast icons** - Large, clear symbols in tray and dashboard
+- 📏 **WCAG 2.1 compliant** - Proper text contrast and visual hierarchy
+- 🌐 **Universal symbols** - Checkmarks, exclamations, and X marks for all users
+- 🎯 **No color-only information** - All status info conveyed through multiple channels
 
 ---
 
 ## 📋 Overview
 
-**AMI** (Active Monitor of Internet) is a lightweight Windows desktop application that monitors your internet connection in real-time. Unlike basic network indicators, AMI distinguishes between local network connectivity and actual internet access, making it perfect for:
+**AMI** (Active Monitor of Internet) is a lightweight, cross-platform desktop application that monitors your internet connection in real-time. Unlike basic network indicators, AMI distinguishes between local network connectivity and actual internet access, making it perfect for:
 
 - 🚆 Unstable connections (trains, mobile hotspots)
 - 📡 Captive portal detection (public Wi-Fi)
@@ -49,11 +58,16 @@ AMI features a **completely redesigned UI** with:
 - **Real-time Monitoring**: Configurable polling interval (default: 1 second)
 
 ### User Interface
-- **System Tray Icon**: Minimal, always-visible status indicator
-  - 🟢 Green: Online (stable connection)
-  - 🟡 Yellow: Unstable (high latency or packet loss)
-  - 🔴 Red: Offline (no internet)
-- **Interactive Dashboard**: Detailed statistics with live graphs
+- **Accessible Tray Icon**: Large, high-contrast status indicator with symbols
+  - 🟢 ✓ Green Checkmark: Online (stable connection)
+  - 🟡 ! Yellow Exclamation: Unstable (high latency or packet loss)
+  - 🔴 ✕ Red X: Offline (no internet)
+  - **Colorblind-friendly**: Symbols visible even without color perception
+- **Modern Dashboard**: Clean, professional interface with real-time graphs
+  - Stripe/Vercel-inspired design
+  - Subtle shadows and rounded corners
+  - Responsive layout that adapts to window size
+- **Compact Mode**: Minimal view for small windows
 - **Tooltip Information**: Quick status overview on hover
 
 ### Notifications
@@ -80,8 +94,9 @@ AMI features a **completely redesigned UI** with:
 ## 🚀 Installation
 
 ### Prerequisites
-- Windows 10/11 (64-bit)
-- Python 3.8+ (for development) or use pre-built executable
+- **Windows**: Windows 10/11 (64-bit)
+- **macOS**: macOS 10.14+ (Mojave or later)
+- **Development**: Python 3.8+ or use pre-built executable
 
 ### Option 1: Pre-built Executable (Recommended for Users)
 
@@ -108,7 +123,7 @@ AMI features a **completely redesigned UI** with:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/AMI.git
+git clone https://github.com/dgiovannetti/AMI.git
 cd AMI
 
 # Install dependencies
@@ -255,9 +270,11 @@ AMI uses a multi-layered approach to determine internet connectivity:
 
 ### Status Determination
 
-- **🟢 Online**: All tests pass, latency < threshold, minimal packet loss
-- **🟡 Unstable**: Some tests pass but high latency or significant packet loss
-- **🔴 Offline**: No successful connections
+- **🟢 ✓ Online**: All tests pass, latency < threshold, minimal packet loss
+- **🟡 ! Unstable**: Some tests pass but high latency or significant packet loss
+- **🔴 ✕ Offline**: No successful connections
+
+**Accessibility Note**: Each status uses a unique symbol (✓, !, ✕) in addition to color, ensuring users with color vision deficiencies can distinguish states.
 
 ## ⚙️ Advanced Features
 
@@ -313,20 +330,52 @@ You can add or modify test hosts:
 - Ensure `notifications.enabled` is `true` in config.json
 - Check if silent mode is disabled
 
+## ♿ Accessibility Statement
+
+AMI is designed to be accessible to all users, including those with visual impairments:
+
+- **Color Vision Deficiency Support**: All status information uses symbols (✓, !, ✕) alongside colors
+- **High Contrast**: Large, clear icons with strong contrast ratios
+- **WCAG 2.1 Compliance**: Meets Level AA standards for visual presentation
+- **Universal Design**: Symbols are internationally recognized and culturally neutral
+
+Supported conditions:
+- Deuteranopia (red-green colorblindness)
+- Protanopia (red-green colorblindness)
+- Tritanopia (blue-yellow colorblindness)
+- Achromatopsia (total colorblindness)
+
 ## 📝 License
 
-This project is open source and available under the MIT License.
+This project is **open source** and available under the MIT License.
+
+**Now Public!** AMI is freely available for personal and commercial use.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit issues or pull requests.
+**AMI is now public and open for contributions!**
+
+We welcome:
+- 🐛 Bug reports and fixes
+- ✨ Feature requests and implementations
+- 🌍 Translations and localization
+- 📚 Documentation improvements
+- ♿ Accessibility enhancements
+
+Please feel free to:
+1. Fork the repository
+2. Create a feature branch
+3. Submit a pull request
+
+For major changes, please open an issue first to discuss what you would like to change.
 
 ## 📧 Support
 
 For issues, questions, or suggestions:
-- Open an issue on GitHub
-- Check existing documentation
-- Review `ami_log.csv` for diagnostic information
+- 💬 **GitHub Issues**: [Open an issue](https://github.com/dgiovannetti/AMI/issues)
+- 📖 **Documentation**: Check README and docs folder
+- 📊 **Logs**: Review `ami_log.csv` for diagnostic information
+- 🌟 **Star the repo** if you find AMI useful!
 
 ## 🙏 Acknowledgments
 
@@ -368,9 +417,11 @@ AMI was designed with a **laser focus on real internet connectivity detection**,
 AMI is the **only lightweight desktop tool** that:
 1. ✅ **Distinguishes local network from actual internet** (HTTP + ICMP verification)
 2. ✅ **Combines real-time dashboard + logging + native notifications** in one portable package
-3. ✅ **Delivers professional UX** with dark modern interface and smooth animations
+3. ✅ **Delivers professional UX** with modern Stripe/Vercel-inspired interface
 4. ✅ **Runs efficiently** (~1% CPU, 50MB RAM) without server infrastructure
-5. ✅ **Applies settings live** via GUI without restart or config file editing
+5. ✅ **Fully accessible** - WCAG 2.1 compliant with colorblind-friendly design
+6. ✅ **Cross-platform** - Works on Windows and macOS
+7. ✅ **Open source** - MIT licensed, community-driven development
 
 ### 🎯 When to Choose AMI
 
