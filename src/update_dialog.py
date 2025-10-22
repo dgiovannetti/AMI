@@ -4,7 +4,7 @@ Shows update notification with release notes and install/postpone options
 """
 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QPushButton, QTextEdit, QProgressBar, QMessageBox, QApplication)
+                             QPushButton, QTextEdit, QProgressBar, QMessageBox, QApplication, QFrame)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 from updater import UpdateManager, format_size
