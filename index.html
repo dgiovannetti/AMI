@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="AMI - Active Monitor of Internet. Sai se sei davvero online. Monitor your internet connection in real-time.">
+    <meta name="description" content="AMI - Active Monitor of Internet. Sai se sei davvero online. Modern, accessible network monitoring with colorblind-friendly design. Apache 2.0 licensed.">
     <title>AMI - Active Monitor of Internet</title>
     <style>
         * {
@@ -13,20 +13,20 @@
         }
 
         :root {
-            --bg-dark: #0f172a;
-            --bg-card: #1e293b;
-            --accent-green: #34d399;
-            --accent-yellow: #fbbf24;
-            --accent-blue: #60a5fa;
-            --accent-purple: #a78bfa;
-            --text-primary: #e2e8f0;
-            --text-secondary: #94a3b8;
-            --border: #334155;
+            --bg-light: #F9FAFB;
+            --bg-card: #FFFFFF;
+            --accent-green: #10B981;
+            --accent-blue: #3B82F6;
+            --accent-purple: #8B5CF6;
+            --accent-orange: #F59E0B;
+            --text-primary: #111827;
+            --text-secondary: #6B7280;
+            --border: #E5E7EB;
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', sans-serif;
-            background: var(--bg-dark);
+            background: var(--bg-light);
             color: var(--text-primary);
             line-height: 1.6;
             overflow-x: hidden;
@@ -38,7 +38,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            background: linear-gradient(135deg, #FFFFFF 0%, #F9FAFB 100%);
             position: relative;
             overflow: hidden;
         }
@@ -48,7 +48,7 @@
             position: absolute;
             width: 500px;
             height: 500px;
-            background: radial-gradient(circle, rgba(52, 211, 153, 0.15) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
             top: -200px;
             right: -200px;
             animation: pulse 8s ease-in-out infinite;
@@ -59,7 +59,7 @@
             position: absolute;
             width: 400px;
             height: 400px;
-            background: radial-gradient(circle, rgba(96, 165, 250, 0.15) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%);
             bottom: -150px;
             left: -150px;
             animation: pulse 6s ease-in-out infinite reverse;
@@ -81,14 +81,15 @@
             width: 120px;
             height: 120px;
             margin: 0 auto 2rem;
-            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-green));
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 3rem;
             font-weight: bold;
-            box-shadow: 0 10px 40px rgba(52, 211, 153, 0.3);
+            color: white;
+            box-shadow: 0 10px 40px rgba(59, 130, 246, 0.2);
             animation: float 3s ease-in-out infinite;
         }
 
@@ -449,8 +450,8 @@
             <h1>Active Monitor of Internet</h1>
             <p class="tagline">"Sai se sei davvero online."</p>
             <p class="subtitle">
-                Monitor your internet connection in real-time. Distinguish between local network and actual internet access. 
-                Perfect for unstable connections, captive portals, and network diagnostics.
+                Modern, accessible network monitoring with real-time graphs and colorblind-friendly design. 
+                Distinguish between local network and actual internet access. Apache 2.0 licensed.
             </p>
             <div class="cta-buttons">
                 <a href="#download" class="btn btn-primary">
@@ -463,15 +464,15 @@
             <div class="status-preview">
                 <div class="status-badge">
                     <div class="status-dot green"></div>
-                    <span>Online</span>
+                    <span>✓ Online</span>
                 </div>
                 <div class="status-badge">
                     <div class="status-dot yellow"></div>
-                    <span>Unstable</span>
+                    <span>! Unstable</span>
                 </div>
                 <div class="status-badge">
                     <div class="status-dot red"></div>
-                    <span>Offline</span>
+                    <span>✕ Offline</span>
                 </div>
             </div>
         </div>
@@ -497,9 +498,9 @@
             </div>
             <div class="feature-card fade-in">
                 <div class="feature-icon">📊</div>
-                <h3 class="feature-title">Beautiful Dashboard</h3>
+                <h3 class="feature-title">Modern Dashboard</h3>
                 <p class="feature-desc">
-                    Dark modern interface with real-time graphs, latency trends, and comprehensive statistics. Professional design with animations.
+                    Clean Stripe/Vercel-inspired interface with real-time graphs, subtle shadows, and professional typography. Responsive and accessible.
                 </p>
             </div>
             <div class="feature-card fade-in">
@@ -593,19 +594,27 @@
                 </p>
             </div>
             <div class="feature-card fade-in">
-                <div class="feature-icon">🆓</div>
-                <h3 class="feature-title">Open Source</h3>
+                <div class="feature-icon">♿</div>
+                <h3 class="feature-title">Accessible Design</h3>
                 <p class="feature-desc">
-                    <strong>MIT License, fully transparent.</strong> PingPlotter and MultiPing are proprietary paid. 
-                    AMI delivers enterprise-grade UX with community values.
+                    <strong>WCAG 2.1 compliant, colorblind-friendly.</strong> Status indicators use symbols (✓, !, ✕) alongside colors. 
+                    High contrast icons for all users.
+                </p>
+            </div>
+            <div class="feature-card fade-in">
+                <div class="feature-icon">📜</div>
+                <h3 class="feature-title">Apache 2.0 License</h3>
+                <p class="feature-desc">
+                    <strong>Open source with attribution.</strong> Free for commercial use with required credit to CiaoIM™ and Daniel Giovannetti. 
+                    Patent protection included.
                 </p>
             </div>
         </div>
         <div style="text-align: center; margin-top: 3rem;">
             <p style="color: var(--text-secondary); max-width: 700px; margin: 0 auto 1.5rem;">
-                <strong style="color: var(--accent-green);">AMI is the only lightweight desktop tool</strong> 
-                that combines real internet detection (HTTP + ICMP), modern UX, native notifications, 
-                and live CSV logging in one portable package.
+                <strong style="color: var(--accent-blue);">AMI v2.0 is the only lightweight desktop tool</strong> 
+                that combines real internet detection (HTTP + ICMP), accessible modern UX, native notifications, 
+                and live CSV logging in one portable package. WCAG 2.1 compliant.
             </p>
         </div>
     </section>
@@ -622,9 +631,9 @@
             <span class="tech-badge">PyInstaller</span>
         </div>
         <div class="screenshot-container">
-            <img src="resources/AMI-dashboard.png" alt="AMI Dashboard - Dark Neon Compact UI" class="dashboard-screenshot">
+            <img src="resources/AMI-dashboard.png" alt="AMI Dashboard - Modern Clean UI" class="dashboard-screenshot">
             <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 1rem; text-align: center;">
-                ✨ Dark neon compact UI with real-time graphs, status cards, and connection analytics
+                ✨ Modern Stripe-inspired UI with accessible design, real-time graphs, and clean typography
             </p>
         </div>
     </section>
@@ -666,9 +675,14 @@
                 <a href="https://github.com/dgiovannetti/AMI/issues" class="footer-link">Issues</a>
             </div>
             <div class="footer-credits">
-                <strong>© 2025 CiaoIM™ di Daniel Giovannetti</strong><br>
+                <strong>© 2025 CiaoIM™ by Daniel Giovannetti</strong><br>
                 <a href="https://ciaoim.tech" style="color: var(--accent-blue); text-decoration: none;">ciaoim.tech</a><br>
                 <em style="font-size: 0.8rem; opacity: 0.7;">Crafted logic. Measured force. Front-end vision, compiled systems, and hardcoded ethics.</em><br>
+                <br>
+                <strong style="font-size: 0.85rem;">License:</strong> Apache 2.0 - Free for commercial use with attribution<br>
+                <a href="https://github.com/dgiovannetti/AMI/blob/main/LICENSE" style="color: var(--accent-blue); text-decoration: none; font-size: 0.8rem;">View License</a> | 
+                <a href="https://github.com/dgiovannetti/AMI/blob/main/NOTICE" style="color: var(--accent-blue); text-decoration: none; font-size: 0.8rem;">Attribution Requirements</a><br>
+                <br>
                 <em style="font-size: 0.75rem; opacity: 0.6; margin-top: 0.5rem; display: inline-block;">
                     Intuizione colta insieme a Giovanni Calvario in aliscafo per il 40° Convegno di Capri dei Giovani Imprenditori
                 </em>
