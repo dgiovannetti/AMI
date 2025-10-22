@@ -320,8 +320,8 @@ class SystemTrayApp:
         Returns:
             QIcon object with both color and symbol indicators
         """
-        # Create 128x128 for high DPI
-        pixmap = QPixmap(128, 128)
+        # Create larger 256x256 for better visibility
+        pixmap = QPixmap(256, 256)
         pixmap.fill(Qt.GlobalColor.transparent)
 
         painter = QPainter(pixmap)
@@ -338,18 +338,18 @@ class SystemTrayApp:
             main_color = QColor(239, 68, 68)   # Red-500
             symbol = '✕'  # X for offline
 
-        # Filled circle background
+        # Larger filled circle background (with padding)
         painter.setBrush(main_color)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(32, 32, 64, 64)
+        painter.drawEllipse(48, 48, 160, 160)
 
-        # Add white symbol on top for accessibility
+        # Add white symbol on top for accessibility - larger font
         painter.setPen(QColor(255, 255, 255))
         font = painter.font()
-        font.setPointSize(48)
+        font.setPointSize(96)  # Much larger symbol
         font.setBold(True)
         painter.setFont(font)
-        painter.drawText(32, 32, 64, 64, Qt.AlignmentFlag.AlignCenter, symbol)
+        painter.drawText(48, 48, 160, 160, Qt.AlignmentFlag.AlignCenter, symbol)
 
         painter.end()
 
