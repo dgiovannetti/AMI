@@ -106,6 +106,18 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .tagline {
@@ -113,6 +125,7 @@
             color: var(--text-secondary);
             font-style: italic;
             margin-bottom: 2rem;
+            animation: fadeInUp 0.8s ease-out 0.2s both;
         }
 
         .subtitle {
@@ -122,6 +135,7 @@
             max-width: 700px;
             margin-left: auto;
             margin-right: auto;
+            animation: fadeInUp 0.8s ease-out 0.4s both;
         }
 
         .cta-buttons {
@@ -129,6 +143,7 @@
             gap: 1rem;
             justify-content: center;
             flex-wrap: wrap;
+            animation: fadeInUp 0.8s ease-out 0.6s both;
         }
 
         .btn {
@@ -157,8 +172,12 @@
         }
 
         .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 30px rgba(52, 211, 153, 0.6);
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 8px 40px rgba(52, 211, 153, 0.6);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0) scale(0.98);
         }
 
         .btn-secondary {
@@ -170,6 +189,11 @@
         .btn-secondary:hover {
             border-color: var(--accent-blue);
             background: rgba(96, 165, 250, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary:active {
+            transform: translateY(0);
         }
 
         /* Status Indicators */
@@ -254,9 +278,9 @@
         }
 
         .feature-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-8px);
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.12);
             border-color: var(--accent-blue);
-            box-shadow: 0 10px 30px rgba(96, 165, 250, 0.2);
         }
 
         .feature-icon {
@@ -369,10 +393,10 @@
 
         /* Footer */
         footer {
-            background: #0a0f1a;
-            padding: 3rem 2rem;
-            text-align: center;
+            background: linear-gradient(180deg, var(--bg-light) 0%, var(--bg-card) 100%);
             border-top: 1px solid var(--border);
+            padding: 4rem 2rem 2rem;
+            text-align: center;
         }
 
         .footer-content {
@@ -381,15 +405,21 @@
         }
 
         .footer-branding {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
         }
 
         .footer-tagline {
-            color: var(--text-secondary);
             font-style: italic;
-            margin-bottom: 1.5rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            font-size: 1.1rem;
         }
 
         .footer-links {
@@ -403,17 +433,26 @@
         .footer-link {
             color: var(--text-secondary);
             text-decoration: none;
-            transition: color 0.3s ease;
+            transition: all 0.3s ease;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
         }
 
         .footer-link:hover {
             color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.1);
         }
 
         .footer-credits {
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
             color: var(--text-secondary);
-            font-size: 0.85rem;
-            line-height: 1.8;
+            font-size: 0.9rem;
+            line-height: 2;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         .footer-credits strong {
@@ -635,6 +674,28 @@
             <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 1rem; text-align: center;">
                 ✨ Modern Stripe-inspired UI with accessible design, real-time graphs, and clean typography
             </p>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="section" style="padding: 3rem 2rem; background: var(--bg-card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+        <div style="max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 3rem; text-align: center;">
+            <div class="fade-in">
+                <div style="font-size: 3rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-green), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">v2.0.0</div>
+                <div style="color: var(--text-secondary); margin-top: 0.5rem;">Latest Release</div>
+            </div>
+            <div class="fade-in">
+                <div style="font-size: 3rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-green), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Apache 2.0</div>
+                <div style="color: var(--text-secondary); margin-top: 0.5rem;">Open Source</div>
+            </div>
+            <div class="fade-in">
+                <div style="font-size: 3rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-green), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">2 Platforms</div>
+                <div style="color: var(--text-secondary); margin-top: 0.5rem;">macOS & Windows</div>
+            </div>
+            <div class="fade-in">
+                <div style="font-size: 3rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-green), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">WCAG 2.1</div>
+                <div style="color: var(--text-secondary); margin-top: 0.5rem;">Accessible</div>
+            </div>
         </div>
     </section>
 
