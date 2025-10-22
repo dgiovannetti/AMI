@@ -20,100 +20,84 @@ from PyQt6.QtCore import Qt
 class SettingsDialog(QDialog):
     def __init__(self, config: Dict, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("[AMI] // CONFIG.SYS")
+        self.setWindowTitle("AMI Settings")
         self.setModal(True)
-        self.setMinimumWidth(750)
-        self.setMinimumHeight(650)
+        self.setMinimumWidth(700)
+        self.setMinimumHeight(600)
         self.setStyleSheet("""
             QDialog {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #0D0221, stop:1 #1a0933);
+                background-color: #F5F5F7;
             }
             QLabel {
-                color: #00F5FF;
-                font-family: 'Courier New';
+                color: #000000;
             }
             QTabWidget::pane {
-                border: 3px solid #7209B7;
+                border: 3px solid #000000;
                 border-radius: 0px;
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #0D0221, stop:1 #160633);
+                background-color: #FFFFFF;
+                padding: 24px;
             }
             QTabBar::tab {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #160633, stop:1 #0D0221);
-                color: #7209B7;
+                background-color: transparent;
+                color: #86868B;
                 padding: 14px 28px;
-                border: 2px solid #7209B7;
-                border-bottom: none;
-                border-radius: 0px;
-                font-family: 'Courier New';
+                border: none;
+                border-bottom: 2px solid transparent;
                 font-weight: 700;
                 letter-spacing: 2px;
+                font-size: 12px;
             }
             QTabBar::tab:selected {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #0D0221, stop:1 #160633);
-                color: #00F5FF;
-                border-bottom: 3px solid #00F5FF;
+                background-color: transparent;
+                color: #000000;
+                border-bottom: 4px solid #0071E3;
             }
             QTabBar::tab:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #1a0933, stop:1 #160633);
-                color: #C77DFF;
+                background-color: transparent;
+                color: #000000;
             }
             QLineEdit, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QComboBox {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #0D0221, stop:1 #160633);
-                border: 2px solid #7209B7;
+                background-color: #FFFFFF;
+                border: 2px solid #000000;
                 border-radius: 0px;
-                color: #C77DFF;
+                color: #000000;
                 padding: 10px 14px;
-                font-family: 'Courier New';
-                font-size: 11px;
+                font-size: 13px;
             }
             QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QPlainTextEdit:focus, QComboBox:focus {
-                border-color: #00F5FF;
-                color: #00F5FF;
+                border-left: 4px solid #0071E3;
             }
             QCheckBox {
-                color: #C77DFF;
+                color: #000000;
                 spacing: 10px;
-                font-family: 'Courier New';
+                font-weight: 500;
             }
             QCheckBox::indicator {
                 width: 20px;
                 height: 20px;
-                border: 2px solid #7209B7;
+                border: 2px solid #000000;
                 border-radius: 0px;
-                background: #0D0221;
+                background-color: #FFFFFF;
             }
             QCheckBox::indicator:checked {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #00F5FF, stop:1 #00FF41);
-                border-color: #00F5FF;
+                background-color: #0071E3;
+                border-color: #000000;
             }
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #160633, stop:1 #0D0221);
-                color: #7209B7;
-                border: 2px solid #7209B7;
-                border-radius: 0px;
+                background-color: #FFFFFF;
+                color: #000000;
+                border: 3px solid #000000;
+                border-radius: 2px;
                 padding: 14px 28px;
-                font-family: 'Courier New';
-                font-size: 12px;
+                font-size: 13px;
                 font-weight: 700;
                 letter-spacing: 2px;
             }
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #1a0933, stop:1 #160633);
-                color: #9D4EDD;
-                border-color: #9D4EDD;
+                background-color: #E8E8ED;
             }
             QPushButton:pressed {
-                background: #0D0221;
-                border-color: #00F5FF;
+                background-color: #D1D1D6;
             }
         """)
         self._original = deepcopy(config)  # keep original
@@ -133,34 +117,40 @@ class SettingsDialog(QDialog):
         self._init_logging_tab()
         self._init_ui_tab()
 
-        # Buttons - Cyberpunk style
+        # Buttons - Tesla style
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        self.btn_cancel = QPushButton("[ESC] CANCEL")
-        self.btn_save = QPushButton("[ENTER] SAVE_CONFIG")
+        self.btn_cancel = QPushButton("CANCEL")
+        self.btn_save = QPushButton("SAVE SETTINGS")
         self.btn_cancel.clicked.connect(self.reject)
         self.btn_save.clicked.connect(self._on_save)
         
-        # Style save button with neon cyan/green
+        # Style save button with electric blue
         self.btn_save.setStyleSheet("""
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #00F5FF, stop:1 #00FF41);
-                color: #0D0221;
-                border: 3px solid #00F5FF;
-                padding: 16px 36px;
+                background-color: #0071E3;
+                color: #FFFFFF;
+                border: 3px solid #000000;
+                padding: 14px 32px;
                 font-weight: 700;
+                letter-spacing: 2px;
             }
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #00FF41, stop:1 #00F5FF);
-                border-color: #00FF41;
-                box-shadow: 0 0 30px #00F5FF;
+                background-color: #0077ED;
             }
             QPushButton:pressed {
-                background: #00F5FF;
+                background-color: #0051A3;
             }
         """)
+        
+        # Hard shadows on buttons
+        from PyQt6.QtWidgets import QGraphicsDropShadowEffect
+        from PyQt6.QtGui import QColor
+        save_shadow = QGraphicsDropShadowEffect()
+        save_shadow.setColor(QColor(0, 0, 0, 255))
+        save_shadow.setBlurRadius(0)
+        save_shadow.setOffset(4, 4)
+        self.btn_save.setGraphicsEffect(save_shadow)
         
         btn_row.addWidget(self.btn_cancel)
         btn_row.addWidget(self.btn_save)

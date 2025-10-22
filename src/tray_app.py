@@ -312,7 +312,7 @@ class SystemTrayApp:
     
     def create_icon(self, color: str) -> QIcon:
         """
-        Create Cyberpunk tray icon: neon ring with glow
+        Create Brutalist tray icon: filled circle with thick black border
 
         Args:
             color: Color name ('green', 'yellow', 'red')
@@ -327,33 +327,20 @@ class SystemTrayApp:
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Cyberpunk neon colors
+        # Brutalist colors: Apple-inspired
         if color == 'green':
-            main_color = QColor(0, 255, 65)  # Neon green
-            glow_color = QColor(0, 255, 65, 80)
+            main_color = QColor(52, 199, 89)  # Apple Green
         elif color == 'yellow':
-            main_color = QColor(0, 245, 255)  # Cyan
-            glow_color = QColor(0, 245, 255, 80)
+            main_color = QColor(255, 149, 0)  # Apple Orange
         else:  # red
-            main_color = QColor(255, 0, 110)  # Hot pink
-            glow_color = QColor(255, 0, 110, 80)
+            main_color = QColor(255, 59, 48)   # Apple Red
 
-        # Outer glow
-        painter.setBrush(glow_color)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(16, 16, 96, 96)
-
-        # Neon ring
-        pen = QPen(main_color)
-        pen.setWidth(8)
-        painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawEllipse(36, 36, 56, 56)
-
-        # Inner dot
+        # Filled circle with thick border
         painter.setBrush(main_color)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(56, 56, 16, 16)
+        pen = QPen(QColor(0, 0, 0))
+        pen.setWidth(6)
+        painter.setPen(pen)
+        painter.drawEllipse(32, 32, 64, 64)
 
         painter.end()
 
