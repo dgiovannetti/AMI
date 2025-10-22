@@ -137,12 +137,16 @@ if [ "$WINDOWS_BUILD" = true ]; then
         --title "${RELEASE_NAME}" \
         --notes-file /tmp/ami_release_notes.md \
         dist/AMI-macOS.zip \
+        dist/AMI-macOS-App.zip \
+        dist/AMI-macOS-Installer.dmg \
         dist/AMI-Windows.zip
 else
     gh release create "${TAG}" \
         --title "${RELEASE_NAME}" \
         --notes-file /tmp/ami_release_notes.md \
-        dist/AMI-macOS.zip
+        dist/AMI-macOS.zip \
+        dist/AMI-macOS-App.zip \
+        dist/AMI-macOS-Installer.dmg
     
     echo ""
     echo "⚠️  Remember to add Windows build manually:"
