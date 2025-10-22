@@ -103,10 +103,15 @@ class NetworkMonitor:
                     timeout_ms = str(timeout * 1000)
                     
                     # Run ping command
+                    kwargs = {
+                        'capture_output': True,
+                        'text': True,
+                    }
+                    if sys.platform == 'win32':
+                        kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
                     result = subprocess.run(
                         ['ping', param, '1', timeout_param, timeout_ms, host],
-                        capture_output=True,
-                        text=True,
+                        **kwargs,
                         timeout=timeout + 1
                     )
                     
@@ -416,7 +421,7 @@ class NetworkMonitor:
                     pass
             elif plat == 'win32':
                 try:
-                    out = subprocess.check_output(['ipconfig', '/all'], text=True, timeout=3, creationflags=0)
+                    out = subprocess.check_output(['ipconfig', '/all'], text=True, timeout=3, creationflags=subprocess.CREATE_NO_WINDOW)
                     patterns = ['TAP', 'TUN', 'WireGuard', 'PPP adapter', 'NordLynx']
                     if any(pat.lower() in out.lower() for pat in patterns):
                         self._last_vpn_status = (True, 'adapter')

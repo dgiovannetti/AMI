@@ -85,6 +85,7 @@ def build_executable():
         '--name=AMI',
         '--windowed',  # No console window
         '--onefile',  # Single executable
+        '--noconsole' if sys.platform == 'win32' else '',  # Extra flag for Windows
         f'--icon={icon_file}' if icon_file.exists() else '',
         '--add-data', f'{config_file}{os.pathsep}.',  # Include config.json
         f'--paths={src_dir}',  # Add src directory to Python path
