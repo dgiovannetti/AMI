@@ -1,6 +1,6 @@
 # AMI v2.0.0 - Public Release 🎉
 
-**Release Date:** January 22, 2025
+**Release Date:** October 22, 2025
 
 **"Sai se sei davvero online."**
 
@@ -61,7 +61,7 @@ All status indicators now use **symbols + colors**:
 
 ---
 
-## 📜 License Change: MIT → Apache 2.0
+## 📜 License: Apache 2.0
 
 ### Why Apache 2.0?
 - ✅ **Requires attribution** for commercial use
@@ -164,43 +164,12 @@ See [NOTICE](NOTICE) file for complete requirements.
 
 ---
 
-## 🎯 Breaking Changes
-
-### Visual
-- **Theme**: Dark → Light (complete redesign)
-- **Colors**: Stark B&W → Tailwind palette
-- **Typography**: Ultra-light → Bold for values
-
-### License
-- **MIT → Apache 2.0** (requires attribution for commercial use)
-
-### No Code Breaking Changes
-- All APIs remain compatible
-- Config file format unchanged
-- Log format unchanged
-
----
-
 ## 🙏 Acknowledgments
 
 Special thanks to:
 - **Giovanni Calvario** - For the original inspiration during the 40° Convegno di Capri
 - **Open source community** - For PyQt6, matplotlib, requests, ping3
 - **Accessibility advocates** - For WCAG guidelines and colorblind awareness
-
----
-
-## 📊 Comparison with v1.0
-
-| Feature | v1.0 | v2.0 |
-|---------|------|------|
-| **Theme** | Dark neon | Light modern |
-| **Accessibility** | Colors only | Colors + symbols |
-| **License** | MIT | Apache 2.0 |
-| **Tray Icon** | 128x128px | 512x512px |
-| **Dashboard** | Brutalist | Stripe-inspired |
-| **WCAG** | No | 2.1 Level AA |
-| **Status** | Private | Public |
 
 ---
 
