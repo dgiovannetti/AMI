@@ -189,6 +189,11 @@ class SettingsDialog(QDialog):
         self.enable_http.setChecked(bool(self._config['monitoring'].get('enable_http_test', True)))
         form.addRow("", self.enable_http)
 
+        # Internal instability test (simulation)
+        self.internal_test = QCheckBox("Enable internal instability test (simulate flapping network)")
+        self.internal_test.setChecked(bool(self._config['monitoring'].get('internal_test_mode', False)))
+        form.addRow("", self.internal_test)
+
         layout.addLayout(form)
         layout.addStretch()
         self.tabs.addTab(tab, "Monitoring")
@@ -304,6 +309,7 @@ class SettingsDialog(QDialog):
         cfg['monitoring']['timeout'] = int(self.timeout.value())
         cfg['monitoring']['retry_count'] = int(self.retry_count.value())
         cfg['monitoring']['enable_http_test'] = bool(self.enable_http.isChecked())
+        cfg['monitoring']['internal_test_mode'] = bool(self.internal_test.isChecked())
 
         # Thresholds
         cfg['thresholds']['unstable_latency_ms'] = int(self.unstable_latency.value())

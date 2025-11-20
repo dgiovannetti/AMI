@@ -62,6 +62,9 @@ class NetworkMonitor:
         self.timeout = config['monitoring']['timeout']
         self.retry_count = config['monitoring']['retry_count']
         self.enable_http_test = config['monitoring']['enable_http_test']
+        # Internal test mode: simulate flapping connection without real network IO
+        self.internal_test_mode = config['monitoring'].get('internal_test_mode', False)
+        self._test_counter = 0
         
         # Thresholds
         self.unstable_latency = config['thresholds']['unstable_latency_ms']
@@ -309,17 +312,22 @@ class NetworkMonitor:
         """
         self.total_checks += 1
         
-        # Ping all hosts
-        ping_results = self.ping_all_hosts()
-        
-        # Test HTTP connectivity
-        http_ok = self.test_http_connectivity()
-        
-        # Check local network
-        local_ok = self.check_local_network()
-        
-        # Analyze results
-        status = self.analyze_connection(ping_results, http_ok, local_ok)
+        # When internal test mode is enabled, simulate connection behaviour
+        # instead of performing real network operations.
+        if self.internal_test_mode:
+            status = self._simulate_connection()
+        else:
+            # Ping all hosts
+            ping_results = self.ping_all_hosts()
+
+            # Test HTTP connectivity
+            http_ok = self.test_http_connectivity()
+
+            # Check local network
+            local_ok = self.check_local_network()
+
+            # Analyze results
+            status = self.analyze_connection(ping_results, http_ok, local_ok)
 
         # Refresh ISP info at most every 30 minutes or on IP change
         try:
@@ -349,6 +357,49 @@ class NetworkMonitor:
         
         self.last_status = status
         return status
+
+    def _simulate_connection(self) -> ConnectionStatus:
+        """Simulate connection status for internal instability testing.
+
+        Cycles deterministically through ONLINE → UNSTABLE → OFFLINE phases
+        so that UI, notifications and logging can be stress-tested without
+        depending on real network conditions.
+        """
+        self._test_counter += 1
+        phase = self._test_counter % 12
+
+        # 0-5: online, 6-8: unstable, 9-11: offline
+        if phase <= 5:
+            status = 'online'
+            avg_latency = 40.0
+            succ = 3
+            total = 3
+            http_ok = True
+            internet_ok = True
+        elif phase <= 8:
+            status = 'unstable'
+            avg_latency = 800.0
+            succ = 1
+            total = 3
+            http_ok = True
+            internet_ok = True
+        else:
+            status = 'offline'
+            avg_latency = None
+            succ = 0
+            total = 3
+            http_ok = False
+            internet_ok = False
+
+        return ConnectionStatus(
+            status=status,
+            avg_latency_ms=avg_latency,
+            successful_pings=succ,
+            total_pings=total,
+            local_network_ok=True,
+            internet_ok=internet_ok,
+            http_test_ok=http_ok,
+        )
 
     # ===== ISP / VPN helpers =====
     def _get_public_network_info(self) -> Optional[Dict]:

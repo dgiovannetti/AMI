@@ -83,6 +83,7 @@ class SystemTrayApp:
         
         # Current status
         self.current_status = None
+        # Background monitoring thread reference (managed safely)
         self.monitor_thread = None
         
         # Start API server if enabled
@@ -195,6 +196,7 @@ class SystemTrayApp:
         mon.timeout = new_config['monitoring']['timeout']
         mon.retry_count = new_config['monitoring']['retry_count']
         mon.enable_http_test = new_config['monitoring']['enable_http_test']
+        mon.internal_test_mode = new_config['monitoring'].get('internal_test_mode', False)
         mon.unstable_latency = new_config['thresholds']['unstable_latency_ms']
         mon.unstable_loss = new_config['thresholds']['unstable_loss_percent']
 
@@ -463,15 +465,38 @@ class SystemTrayApp:
     
     def check_connection(self):
         """Perform connection check in background thread"""
-        # Check if thread is already running to prevent overlap
-        if self.monitor_thread is not None and self.monitor_thread.isRunning():
-            return
+        # Check if a previous monitor thread is still running.
+        # Guard against Qt RuntimeError when the underlying C++ object
+        # has already been deleted.
+        if self.monitor_thread is not None:
+            try:
+                if self.monitor_thread.isRunning():
+                    return
+            except RuntimeError:
+                # Wrapped C++ object was deleted; clear stale reference
+                self.monitor_thread = None
 
         # Create and start monitor thread
         self.monitor_thread = MonitorThread(self.monitor)
         self.monitor_thread.status_updated.connect(self.on_status_updated)
-        self.monitor_thread.finished.connect(self.monitor_thread.deleteLater)
+        self.monitor_thread.finished.connect(self.on_monitor_thread_finished)
         self.monitor_thread.start()
+
+    def on_monitor_thread_finished(self):
+        """Cleanup callback when monitor thread finishes."""
+        try:
+            thread = self.sender()
+        except Exception:
+            thread = None
+        # Clear reference so a new thread can be started safely
+        self.monitor_thread = None
+        # Ensure Qt-side resources are released
+        if thread is not None:
+            try:
+                thread.deleteLater()
+            except RuntimeError:
+                # Already deleted on C++ side; nothing more to do
+                pass
     
     def on_status_updated(self, status):
         """

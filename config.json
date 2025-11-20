@@ -18,7 +18,8 @@
     "polling_interval": 1,
     "timeout": 5,
     "retry_count": 2,
-    "enable_http_test": true
+    "enable_http_test": true,
+    "internal_test_mode": false
   },
   "thresholds": {
     "unstable_latency_ms": 500,
