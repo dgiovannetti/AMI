@@ -83,6 +83,7 @@ class SystemTrayApp:
         
         # Current status
         self.current_status = None
+        self.monitor_thread = None
         
         # Start API server if enabled
         self.splash.showMessage("Finalizing...")
@@ -462,9 +463,14 @@ class SystemTrayApp:
     
     def check_connection(self):
         """Perform connection check in background thread"""
+        # Check if thread is already running to prevent overlap
+        if self.monitor_thread is not None and self.monitor_thread.isRunning():
+            return
+
         # Create and start monitor thread
         self.monitor_thread = MonitorThread(self.monitor)
         self.monitor_thread.status_updated.connect(self.on_status_updated)
+        self.monitor_thread.finished.connect(self.monitor_thread.deleteLater)
         self.monitor_thread.start()
     
     def on_status_updated(self, status):
