@@ -56,6 +56,12 @@ class SystemTrayApp:
         self.app = QApplication(sys.argv)
         self.app.setQuitOnLastWindowClosed(False)
         
+        # Set proper activation policy for macOS (accessory app)
+        if sys.platform == 'darwin':
+            from PyQt6.QtCore import QOperatingSystemVersion
+            # On macOS, set as accessory app (no dock icon)
+            self.app.setActivationPolicy(1)  # Qt::ApplicationModal 1 = accessory
+        
         # Show splash screen
         self.splash = UltraModernSplashScreen()
         self.splash.show()
@@ -90,9 +96,21 @@ class SystemTrayApp:
         self.splash.showMessage("Finalizing...")
         self.app.processEvents()
         self.api_server.start()
+
+        # Check system tray availability (useful for debugging on macOS)
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            print("[AMI] System tray is NOT available on this system.")
+        else:
+            print("[AMI] System tray is available.")
         
-        # Create tray icon
-        self.tray_icon = QSystemTrayIcon(self.app)
+        # Create tray icon (no icon yet; will be set by update_icon)
+        print("[AMI] Creating QSystemTrayIcon...")
+        self.tray_icon = QSystemTrayIcon()
+        
+        # Create a simple initial icon (red circle) to ensure visibility
+        initial_icon = self.create_simple_icon(QColor(239, 68, 68))  # Red color
+        self.tray_icon.setIcon(initial_icon)
+        
         self.tray_icon.setToolTip("AMI - Starting...")
         # Attach tray icon to notifier for cross-platform notifications
         try:
@@ -102,6 +120,7 @@ class SystemTrayApp:
         
         # Set initial icon
         self.update_icon('offline')
+        print("[AMI] Initial tray icon set to OFFLINE and showing tray icon...")
         
         # Initialize updater BEFORE creating menu so menu item is present
         self.updater = None
@@ -135,6 +154,7 @@ class SystemTrayApp:
         
         # Show tray icon
         self.tray_icon.show()
+        print("[AMI] QSystemTrayIcon.show() called.")
         
         # Perform initial check
         self.check_connection()
@@ -312,6 +332,28 @@ class SystemTrayApp:
                 )
             except Exception:
                 pass
+    
+    def create_simple_icon(self, color: QColor) -> QIcon:
+        """
+        Create a simple colored circle icon for basic testing
+        
+        Args:
+            color: QColor for the circle
+            
+        Returns:
+            QIcon with a colored circle
+        """
+        pixmap = QPixmap(64, 64)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setBrush(color)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(4, 4, 56, 56)
+        painter.end()
+        
+        return QIcon(pixmap)
     
     def create_icon(self, color: str) -> QIcon:
         """
