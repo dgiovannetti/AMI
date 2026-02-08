@@ -1,4 +1,4 @@
-# 📦 Pubblicare Release v2.1.0 su GitHub
+# 📦 Publish Release v2.1.0 on GitHub / Pubblicare Release v2.1.0 su GitHub
 
 ## 1. Build (già fatto)
 
