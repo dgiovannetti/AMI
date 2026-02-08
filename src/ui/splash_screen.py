@@ -14,7 +14,7 @@ import sys
 class UltraModernSplashScreen(QSplashScreen):
     """Ultra professional enterprise splash screen"""
 
-    def __init__(self, version: str = "2.1.1"):
+    def __init__(self, version: str = "2.1.2"):
         self._version = version
         pixmap = QPixmap(480, 300)
         pixmap.fill(Qt.GlobalColor.transparent)
@@ -118,7 +118,10 @@ class UltraModernSplashScreen(QSplashScreen):
         if callback:
             self.fade_animation.finished.connect(callback)
 
-        self.fade_animation.finished.connect(self.close)
+        # Defer close to next event loop to avoid "chiusura inattesa" (animation vs widget destruction)
+        def _do_close():
+            QTimer.singleShot(0, self.close)
+        self.fade_animation.finished.connect(_do_close)
         self.fade_animation.start()
 
     def showMessage(self, message, color=None):

@@ -62,7 +62,7 @@ class SystemTrayApp:
         self.config = self.load_config()
         
         # Show splash screen (with version from config)
-        app_version = self.config.get('app', {}).get('version', '2.1.1')
+        app_version = self.config.get('app', {}).get('version', '2.1.2')
         self.splash = UltraModernSplashScreen(version=app_version)
         self.splash.show()
         self.splash.showMessage("Loading configuration...")

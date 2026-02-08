@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.1.1-brightgreen" alt="Version"/>
+  <img src="https://img.shields.io/badge/version-2.1.2-brightgreen" alt="Version"/>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-blue" alt="Platform"/>
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"/>
   <img src="https://img.shields.io/badge/status-public-success" alt="Status"/>
