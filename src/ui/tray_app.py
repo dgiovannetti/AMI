@@ -6,22 +6,24 @@ Main application with system tray icon and menu
 """
 
 import sys
-import json
 import os
 from pathlib import Path
-from PyQt6.QtWidgets import (QApplication, QSystemTrayIcon, QMenu, 
+from PyQt6.QtWidgets import (QApplication, QSystemTrayIcon, QMenu,
                             QMessageBox)
 from PyQt6.QtCore import QTimer, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon, QAction, QPixmap, QPainter, QColor, QFont, QRadialGradient, QPen
 
-from network_monitor import NetworkMonitor
-from logger import EventLogger
-from notifier import Notifier
-from api_server import APIServer
-from splash_screen import UltraModernSplashScreen
-from settings_dialog import SettingsDialog
-from updater import UpdateManager
-from update_dialog import UpdateDialog
+from core.paths import get_base_path, get_user_data_dir
+from core.config import load_config as load_config_from_core, save_config as save_config_to_core, get_config_path_for_ui
+from services.network_monitor import NetworkMonitor
+from services.logger import EventLogger
+from services.notifier import Notifier
+from services.api_server import APIServer
+from services.updater import UpdateManager
+from ui.splash_screen import UltraModernSplashScreen
+from ui.settings_dialog import SettingsDialog
+from ui.update_dialog import UpdateDialog
+from ui.compact_status import CompactStatusWindow
 
 
 class MonitorThread(QThread):
@@ -56,20 +58,15 @@ class SystemTrayApp:
         self.app = QApplication(sys.argv)
         self.app.setQuitOnLastWindowClosed(False)
         
-        # Set proper activation policy for macOS (accessory app)
-        if sys.platform == 'darwin':
-            from PyQt6.QtCore import QOperatingSystemVersion
-            # On macOS, set as accessory app (no dock icon)
-            self.app.setActivationPolicy(1)  # Qt::ApplicationModal 1 = accessory
+        # Load configuration first (needed for splash version)
+        self.config = self.load_config()
         
-        # Show splash screen
-        self.splash = UltraModernSplashScreen()
+        # Show splash screen (with version from config)
+        app_version = self.config.get('app', {}).get('version', '2.0.0')
+        self.splash = UltraModernSplashScreen(version=app_version)
         self.splash.show()
         self.splash.showMessage("Loading configuration...")
         self.app.processEvents()
-        
-        # Load configuration
-        self.config = self.load_config()
         self.splash.showMessage("Initializing network monitor...")
         self.app.processEvents()
         
@@ -103,13 +100,14 @@ class SystemTrayApp:
         else:
             print("[AMI] System tray is available.")
         
-        # Create tray icon (no icon yet; will be set by update_icon)
+        # Create tray icon (use PNG from resources on macOS for reliable menu bar display)
         print("[AMI] Creating QSystemTrayIcon...")
         self.tray_icon = QSystemTrayIcon()
-        
-        # Create a simple initial icon (red circle) to ensure visibility
-        initial_icon = self.create_simple_icon(QColor(239, 68, 68))  # Red color
-        self.tray_icon.setIcon(initial_icon)
+        red_icon_path = get_base_path() / 'resources' / 'status_red.png'
+        if red_icon_path.exists():
+            self.tray_icon.setIcon(QIcon(str(red_icon_path)))
+        else:
+            self.tray_icon.setIcon(self.create_simple_icon(QColor(239, 68, 68)))
         
         self.tray_icon.setToolTip("AMI - Starting...")
         # Attach tray icon to notifier for cross-platform notifications
@@ -128,7 +126,8 @@ class SystemTrayApp:
         if self.config.get('updates', {}).get('enabled', True):
             app_version = self.config.get('app', {}).get('version', '1.0.0')
             github_repo = self.config.get('updates', {}).get('github_repo', 'dgiovannetti/AMI')
-            self.updater = UpdateManager(app_version, github_repo)
+            max_postpone = self.config.get('updates', {}).get('max_postponements', 3)
+            self.updater = UpdateManager(app_version, github_repo, max_postponements=max_postpone)
             
             # Check for updates on startup if configured
             if self.config.get('updates', {}).get('check_on_startup', True):
@@ -156,6 +155,15 @@ class SystemTrayApp:
         self.tray_icon.show()
         print("[AMI] QSystemTrayIcon.show() called.")
         
+        # Compact status window (always visible in Dock - fallback when menu bar icon is not visible on macOS)
+        self.compact_status = None
+        use_compact = self.config.get('ui', {}).get('compact_status_window')
+        if use_compact is None:
+            use_compact = sys.platform == 'darwin'  # Default True on macOS
+        if use_compact:
+            self.compact_status = CompactStatusWindow(self.config, self.monitor, self.tray_icon)
+            self.compact_status.show()
+        
         # Perform initial check
         self.check_connection()
         
@@ -179,21 +187,12 @@ class SystemTrayApp:
             self.splash.fade_out()
     
     def load_config(self) -> dict:
-        """Load configuration from config.json"""
-        # Get base path - works for both development and PyInstaller
-        if getattr(sys, 'frozen', False):
-            # Running as compiled executable
-            base_path = Path(sys._MEIPASS)
-        else:
-            # Running as script
-            base_path = Path(__file__).parent.parent
-
-        self.base_path = base_path
-        self.config_path = base_path / 'config.json'
+        """Load configuration from config.json (centralized path resolution)"""
+        self.base_path = get_base_path()
+        self.config_path = get_config_path_for_ui()
 
         try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+            return load_config_from_core()
         except Exception as e:
             QMessageBox.critical(None, "Error", f"Failed to load config.json: {e}\nPath: {self.config_path}")
             sys.exit(1)
@@ -201,8 +200,7 @@ class SystemTrayApp:
     def save_config(self):
         """Persist current config to config.json"""
         try:
-            with open(self.config_path, 'w', encoding='utf-8') as f:
-                json.dump(self.config, f, ensure_ascii=False, indent=2)
+            save_config_to_core(self.config)
         except Exception as e:
             QMessageBox.critical(None, "Error", f"Failed to save config.json: {e}\nPath: {self.config_path}")
 
@@ -242,10 +240,23 @@ class SystemTrayApp:
         except Exception:
             pass
 
+        # Compact status window: show/hide based on setting
+        use_compact = new_config.get('ui', {}).get('compact_status_window', False)
+        if use_compact and not getattr(self, 'compact_status', None):
+            self.compact_status = CompactStatusWindow(self.config, self.monitor, self.tray_icon)
+            self.compact_status.show()
+            if self.current_status:
+                self.compact_status.update_status(self.current_status)
+        elif not use_compact and getattr(self, 'compact_status', None):
+            self.compact_status.close()
+            self.compact_status = None
+
     
     def create_menu(self):
         """Create system tray context menu"""
-        menu = QMenu()
+        # Keep reference on macOS - without it the menu gets garbage collected and tray icon may not show
+        self._tray_menu = QMenu()
+        menu = self._tray_menu
         
         # Status display (disabled, just for info)
         self.status_action = QAction("Status: Checking...", menu)
@@ -400,20 +411,23 @@ class SystemTrayApp:
 
         return QIcon(pixmap)
     
+    def _get_resource_path(self, filename: str) -> Path:
+        """Get path to resource file (works for dev and PyInstaller)"""
+        base = get_base_path()
+        return base / 'resources' / filename
+
     def update_icon(self, status: str):
         """
-        Update tray icon based on status
-        
-        Args:
-            status: 'online', 'unstable', or 'offline'
+        Update tray icon based on status.
+        Prefer PNG from resources on macOS for reliable menu bar display.
         """
-        if status == 'online':
-            icon = self.create_icon('green')
-        elif status == 'unstable':
-            icon = self.create_icon('yellow')
+        status_to_file = {'online': 'status_green.png', 'unstable': 'status_yellow.png', 'offline': 'status_red.png'}
+        png_path = self._get_resource_path(status_to_file.get(status, 'status_red.png'))
+        if png_path.exists():
+            icon = QIcon(str(png_path))
         else:
-            icon = self.create_icon('red')
-        
+            color = 'green' if status == 'online' else 'yellow' if status == 'unstable' else 'red'
+            icon = self.create_icon(color)
         self.tray_icon.setIcon(icon)
     
     def update_tooltip(self, status):
@@ -563,6 +577,10 @@ class SystemTrayApp:
         # Update dashboard if open
         if self.dashboard and self.dashboard.isVisible():
             self.dashboard.update_data(status, self.monitor.get_statistics())
+        
+        # Update compact status window if shown
+        if self.compact_status:
+            self.compact_status.update_status(status)
     
     def manual_test(self):
         """Perform manual connection test"""
@@ -589,7 +607,7 @@ class SystemTrayApp:
     def show_dashboard(self):
         """Show dashboard window"""
         if self.dashboard is None:
-            from dashboard import EnterpriseDashboard
+            from ui.dashboard import EnterpriseDashboard
             self.dashboard = EnterpriseDashboard(self.config, self.monitor, self.tray_icon)
         
         if self.current_status:
@@ -620,17 +638,18 @@ class SystemTrayApp:
             self.check_connection()
     
     def view_logs(self):
-        """Open log file"""
-        log_file = self.config['logging']['log_file']
+        """Open log file (uses user data dir, same as logger)"""
+        log_filename = self.config['logging']['log_file']
+        log_file = get_user_data_dir() / log_filename
         if os.path.exists(log_file):
             # Open with default application
             import subprocess
             if sys.platform == 'win32':
-                os.startfile(log_file)
+                os.startfile(str(log_file))
             elif sys.platform == 'darwin':
-                subprocess.call(['open', log_file])
+                subprocess.call(['open', str(log_file)])
             else:
-                subprocess.call(['xdg-open', log_file])
+                subprocess.call(['xdg-open', str(log_file)])
         else:
             QMessageBox.information(None, "Logs", "No log file found yet.")
     
@@ -721,10 +740,25 @@ class SystemTrayApp:
         msg.exec()
     
     def exit_app(self):
-        """Exit the application"""
+        """Exit the application - graceful shutdown of all services"""
+        # Stop main monitoring timer
         self.timer.stop()
+        # Stop periodic update checks
+        if getattr(self, 'update_timer', None):
+            self.update_timer.stop()
+        # Wait for any running monitor thread to finish
+        if self.monitor_thread is not None:
+            try:
+                if self.monitor_thread.isRunning():
+                    self.monitor_thread.wait(3000)  # Max 3s
+            except RuntimeError:
+                pass
+            self.monitor_thread = None
+        # Stop API server
         self.api_server.stop()
         self.tray_icon.hide()
+        if getattr(self, 'compact_status', None):
+            self.compact_status.close()
         QApplication.quit()
     
     def run(self):

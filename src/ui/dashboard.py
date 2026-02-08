@@ -12,6 +12,7 @@ from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QPoint, Q
 from PyQt6.QtGui import QFont, QColor, QPixmap, QPainter, QLinearGradient, QPen
 from pathlib import Path
 import sys
+import numpy as np
 import matplotlib
 matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -266,6 +267,19 @@ class EnterpriseDashboard(QMainWindow):
         self.ax2.set_title('Latency (ms)', color='#111827', fontsize=11, fontweight='bold')
         self.ax2.set_ylabel('Latency (ms)', color='#6B7280', fontsize=10)
         self.ax2.set_xlabel('Recent Checks', color='#9CA3AF', fontsize=9)
+        self.ax2.grid(True, alpha=0.1, color='#D1D5DB')
+        self.ax2.tick_params(colors='#6B7280', labelsize=9)
+        self.ax2.spines['top'].set_visible(False)
+        self.ax2.spines['right'].set_visible(False)
+        self.ax2.spines['left'].set_color('#E5E7EB')
+        self.ax2.spines['bottom'].set_color('#E5E7EB')
+
+        # Initialize line/scatter objects for incremental updates (avoids ax.clear() memory churn)
+        self._scatter1 = self.ax1.scatter([], [], s=60, alpha=0.9, edgecolors='white', linewidths=1.5, zorder=3)
+        self._line1, = self.ax1.plot([], [], '-', color='#64748b', alpha=0.4, linewidth=2, zorder=2)
+        self._line2, = self.ax2.plot([], [], '-o', color='#60a5fa', linewidth=2, markersize=4,
+                                     markeredgecolor='white', markeredgewidth=1.5, zorder=3)
+        self._fill2 = None  # Created on first update
 
         content_layout.addWidget(charts_section)
 
@@ -443,7 +457,7 @@ class EnterpriseDashboard(QMainWindow):
         self.update_graphs()
 
     def update_graphs(self):
-        """Update enterprise graphs"""
+        """Update enterprise graphs using set_data (avoids ax.clear() memory churn and flickering)"""
         history = self.monitor.status_history
         if not history:
             return
@@ -457,43 +471,24 @@ class EnterpriseDashboard(QMainWindow):
             status_values.append(status_map.get(h.status, 0))
             latencies.append(h.avg_latency_ms if h.avg_latency_ms else 0)
 
-        # Status plot - modern
-        self.ax1.clear()
-        self.ax1.set_facecolor('#F9FAFB')
-        self.ax1.set_title('Connection Status', color='#111827', fontsize=11, fontweight='bold')
-        self.ax1.set_ylabel('Status', color='#6B7280', fontsize=10)
-        self.ax1.set_xlabel('Recent Checks', color='#9CA3AF', fontsize=9)
-        self.ax1.grid(True, alpha=0.1, color='#D1D5DB')
-        self.ax1.tick_params(colors='#6B7280', labelsize=9)
-        self.ax1.spines['top'].set_visible(False)
-        self.ax1.spines['right'].set_visible(False)
-        self.ax1.spines['left'].set_color('#E5E7EB')
-        self.ax1.spines['bottom'].set_color('#E5E7EB')
-        self.ax1.set_ylim(-0.5, 2.5)
-        self.ax1.set_yticks([0, 1, 2])
-        self.ax1.set_yticklabels(['Offline', 'Unstable', 'Online'])
+        idx = np.array(indices, dtype=float)
+        sv = np.array(status_values, dtype=float)
+        lat = np.array(latencies, dtype=float)
 
-        colors = ['#34d399' if sv == 2 else '#fbbf24' if sv == 1 else '#ef4444' for sv in status_values]
-        self.ax1.scatter(indices, status_values, c=colors, s=60, alpha=0.9, edgecolors='white', linewidths=1.5, zorder=3)
-        self.ax1.plot(indices, status_values, '-', color='#64748b', alpha=0.4, linewidth=2, zorder=2)
+        # Status plot - update scatter and line
+        colors = ['#34d399' if v == 2 else '#fbbf24' if v == 1 else '#ef4444' for v in status_values]
+        self._scatter1.set_offsets(np.c_[idx, sv])
+        self._scatter1.set_facecolors(colors)
+        self._line1.set_data(idx, sv)
 
-        # Latency plot - modern
-        self.ax2.clear()
-        self.ax2.set_facecolor('#F9FAFB')
-        self.ax2.set_title('Latency (ms)', color='#111827', fontsize=11, fontweight='bold')
-        self.ax2.set_ylabel('Latency (ms)', color='#6B7280', fontsize=10)
-        self.ax2.set_xlabel('Recent Checks', color='#9CA3AF', fontsize=9)
-        self.ax2.grid(True, alpha=0.1, color='#D1D5DB')
-        self.ax2.tick_params(colors='#6B7280', labelsize=9)
-        self.ax2.spines['top'].set_visible(False)
-        self.ax2.spines['right'].set_visible(False)
-        self.ax2.spines['left'].set_color('#E5E7EB')
-        self.ax2.spines['bottom'].set_color('#E5E7EB')
+        # Latency plot - update line
+        self._line2.set_data(idx, lat)
+        # Update fill_between (remove old, add new - fill path changes)
+        if self._fill2 is not None:
+            self._fill2.remove()
+        self._fill2 = self.ax2.fill_between(idx, lat, alpha=0.15, color='#60a5fa', zorder=2)
 
-        self.ax2.plot(indices, latencies, '-o', color='#60a5fa', linewidth=2, markersize=4, markeredgecolor='white', markeredgewidth=1.5, zorder=3)
-        self.ax2.fill_between(indices, latencies, alpha=0.15, color='#60a5fa', zorder=2)
-
-        self.canvas.draw()
+        self.canvas.draw_idle()
 
     def refresh_data(self):
         """Refresh data"""

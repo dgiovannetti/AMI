@@ -8,3 +8,4 @@ psutil==5.9.6
 matplotlib==3.8.2
 numpy==1.26.2
 packaging==23.2
+platformdirs>=4.0.0

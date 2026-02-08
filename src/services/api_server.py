@@ -13,10 +13,11 @@ from typing import Optional
 
 
 class APIHandler(BaseHTTPRequestHandler):
-    """HTTP request handler for API endpoints"""
-    
-    monitor = None  # Will be set by APIServer
-    
+    """HTTP request handler for API endpoints. Gets monitor from server (DI, no class variable)."""
+
+    def _get_monitor(self):
+        return getattr(self.server, 'monitor', None)
+
     def do_GET(self):
         """Handle GET requests"""
         if self.path == '/status':
@@ -27,14 +28,15 @@ class APIHandler(BaseHTTPRequestHandler):
             self.send_statistics()
         else:
             self.send_error(404, "Endpoint not found")
-    
+
     def send_status(self):
         """Send current connection status"""
-        if not self.monitor or not self.monitor.last_status:
+        monitor = self._get_monitor()
+        if not monitor or not monitor.last_status:
             self.send_json_response({'error': 'No status available yet'}, 503)
             return
-        
-        status = self.monitor.last_status
+
+        status = monitor.last_status
         response = {
             'status': status.status,
             'timestamp': status.timestamp.isoformat(),
@@ -50,20 +52,24 @@ class APIHandler(BaseHTTPRequestHandler):
     
     def send_health(self):
         """Send health check response"""
+        version = '2.0.0'
+        if hasattr(self.server, 'config') and self.server.config:
+            version = self.server.config.get('app', {}).get('version', version)
         response = {
             'service': 'AMI',
             'status': 'running',
-            'version': '1.0.0'
+            'version': version
         }
         self.send_json_response(response)
     
     def send_statistics(self):
         """Send monitoring statistics"""
-        if not self.monitor:
+        monitor = self._get_monitor()
+        if not monitor:
             self.send_json_response({'error': 'Monitor not available'}, 503)
             return
-        
-        stats = self.monitor.get_statistics()
+
+        stats = monitor.get_statistics()
         response = {
             'total_checks': stats['total_checks'],
             'successful_checks': stats['successful_checks'],
@@ -106,13 +112,12 @@ class APIServer:
         """Start the API server in a background thread"""
         if not self.enabled:
             return
-        
+
         try:
-            # Set the monitor reference for the handler
-            APIHandler.monitor = self.monitor
-            
-            # Create server
+            # Create server with monitor injected (handler gets it via self.server.monitor)
             self.server = HTTPServer(('127.0.0.1', self.port), APIHandler)
+            self.server.monitor = self.monitor
+            self.server.config = self.config
             
             # Start in background thread
             self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)

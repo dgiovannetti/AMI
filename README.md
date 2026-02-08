@@ -435,7 +435,7 @@ AMI was designed with a **laser focus on real internet connectivity detection**,
 | **Real-time Graphs** | 🌈 **Matplotlib live** with smooth animations | ✅ Advanced but heavy | ❌ None | ⚠️ Simple | ✅ Advanced (requires config) |
 | **Resource Usage** | ⚡ **~1% CPU, 50MB RAM** (idle) - optimal balance | ⚠️ 4-6% CPU, 200-300MB RAM | ✅ <1% CPU, 20MB RAM | ⚙️ 2-3% CPU, 100MB RAM | 🚀 500MB-1GB (server + agent) |
 | **Tech Stack** | 🐍 Python 3.8+, PyQt6, parallel threading | C++ proprietary engine | WinAPI / C | C++ | C/C++ + DB backend |
-| **License** | 🆓 **MIT Open Source** - CiaoIM™ branding | 💰 Proprietary (paid) | 🆓 Freeware (closed) | 💰 Proprietary | 🆓 Open source (enterprise) |
+| **License** | 🆓 **Apache 2.0 Open Source** - CiaoIM™ branding | 💰 Proprietary (paid) | 🆓 Freeware (closed) | 💰 Proprietary | 🆓 Open source (enterprise) |
 | **Philosophy** | 🎯 **"Simple, elegant, ethical"** - know if you're really online, no data overload | 🧠 Deep diagnostics, but overwhelming | ⚙️ Utility tool | 💼 Traditional sysadmin | 🏭 Datacenter architecture |
 | **Ideal For** | 💻 **Professionals, digital nomads, IT users**, unstable environments | 🧰 NOC, ISP troubleshooting | 👤 Basic users | 🧑‍🔧 SMB technicians | 🏢 Medium-large enterprises |
 | **Look & Feel** | 🔥 **Minimal pro** - immediate visual impact | 🎛️ Old-school technical | 📟 1998 style | 📉 Neutral, basic | 🌐 Functional but cold |
@@ -451,7 +451,7 @@ AMI is the **only lightweight desktop tool** that:
 4. ✅ **Runs efficiently** (~1% CPU, 50MB RAM) without server infrastructure
 5. ✅ **Fully accessible** - WCAG 2.1 compliant with colorblind-friendly design
 6. ✅ **Cross-platform** - Works on Windows and macOS
-7. ✅ **Open source** - MIT licensed, community-driven development
+7. ✅ **Open source** - Apache 2.0 licensed, community-driven development
 
 ### 🎯 When to Choose AMI
 

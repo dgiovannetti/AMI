@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QTextEdit, QProgressBar, QMessageBox, QApplication, QFrame)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
-from updater import UpdateManager, format_size
+from services.updater import UpdateManager, format_size
 import os
 
 

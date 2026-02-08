@@ -14,7 +14,8 @@ import sys
 class UltraModernSplashScreen(QSplashScreen):
     """Ultra professional enterprise splash screen"""
 
-    def __init__(self):
+    def __init__(self, version: str = "2.0.0"):
+        self._version = version
         pixmap = QPixmap(480, 300)
         pixmap.fill(Qt.GlobalColor.transparent)
 
@@ -73,7 +74,7 @@ class UltraModernSplashScreen(QSplashScreen):
         # Company info - left aligned, professional
         painter.drawText(40, 190, 400, 20, Qt.AlignmentFlag.AlignLeft, "CiaoIM™ di Daniel Giovannetti")
         painter.drawText(40, 210, 400, 20, Qt.AlignmentFlag.AlignLeft, "Internet Connection Monitor")
-        painter.drawText(40, 230, 400, 20, Qt.AlignmentFlag.AlignLeft, "Enterprise Edition v1.0.0")
+        painter.drawText(40, 230, 400, 20, Qt.AlignmentFlag.AlignLeft, f"Enterprise Edition v{self._version}")
 
         # Right side - website and tagline
         painter.setPen(QColor(203, 213, 225))  # #cbd5e1

@@ -9,45 +9,18 @@ This module handles the core network monitoring functionality:
 - Statistics tracking
 """
 
-import asyncio
 import time
 import socket
 import sys
 import subprocess
 from typing import List, Dict, Tuple, Optional
-from dataclasses import dataclass, field
 from datetime import datetime
 import re
 import psutil
 import threading
 import requests
 
-
-@dataclass
-class PingResult:
-    """Result of a single ping test"""
-    host: str
-    success: bool
-    latency_ms: Optional[float] = None
-    error: Optional[str] = None
-    timestamp: datetime = field(default_factory=datetime.now)
-
-
-@dataclass
-class ConnectionStatus:
-    """Overall connection status"""
-    status: str  # 'online', 'unstable', 'offline'
-    avg_latency_ms: Optional[float] = None
-    successful_pings: int = 0
-    total_pings: int = 0
-    local_network_ok: bool = False
-    internet_ok: bool = False
-    http_test_ok: bool = False
-    timestamp: datetime = field(default_factory=datetime.now)
-    public_ip: Optional[str] = None
-    isp: Optional[str] = None
-    vpn_connected: Optional[bool] = None
-    vpn_provider: Optional[str] = None
+from core.models import PingResult, ConnectionStatus
 
 
 class NetworkMonitor:
@@ -99,11 +72,12 @@ class NetworkMonitor:
         """
         try:
             # On macOS/Linux, use system ping command (more reliable, no sudo needed)
+            # Linux (iputils): -W is in seconds. macOS (BSD): -W is in seconds (use seconds for both)
             if sys.platform in ['darwin', 'linux']:
                 try:
                     param = '-n' if sys.platform == 'win32' else '-c'
-                    timeout_param = '-W' if sys.platform == 'linux' else '-W'
-                    timeout_ms = str(timeout * 1000)
+                    timeout_param = '-W'
+                    timeout_seconds = str(timeout)  # Both Linux and macOS use seconds
                     
                     # Run ping command
                     kwargs = {
@@ -113,7 +87,7 @@ class NetworkMonitor:
                     if sys.platform == 'win32':
                         kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
                     result = subprocess.run(
-                        ['ping', param, '1', timeout_param, timeout_ms, host],
+                        ['ping', param, '1', timeout_param, timeout_seconds, host],
                         **kwargs,
                         timeout=timeout + 1
                     )

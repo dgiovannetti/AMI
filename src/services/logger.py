@@ -2,7 +2,9 @@
 AMI - Active Monitor of Internet
 Logging System
 
-Handles event logging to CSV files with automatic rotation
+Handles event logging to CSV files with automatic rotation.
+Log file is stored in user data dir (not CWD) to avoid wrong locations
+when app starts from system startup (e.g. CWD could be System32 or /).
 """
 
 import csv
@@ -11,6 +13,8 @@ import io
 from datetime import datetime
 from typing import Optional
 from pathlib import Path
+
+from core.paths import get_user_data_dir
 
 
 class EventLogger:
@@ -21,10 +25,15 @@ class EventLogger:
     
     def __init__(self, config: dict):
         self.enabled = config['logging']['enabled']
-        self.log_file = config['logging']['log_file']
+        # Use user data dir for log file - avoids CWD-dependent paths
+        log_filename = config['logging']['log_file']
+        self.log_file = str(get_user_data_dir() / log_filename)
         self.max_size_mb = config['logging'].get('max_log_size_mb', 1)
         self.max_size_bytes = int(self.max_size_mb * 1024 * 1024)
         
+        # Ensure log directory exists
+        if self.enabled:
+            Path(self.log_file).parent.mkdir(parents=True, exist_ok=True)
         # Ensure log file exists with headers
         if self.enabled and not os.path.exists(self.log_file):
             self._create_log_file()

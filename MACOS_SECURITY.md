@@ -74,7 +74,7 @@ AMI è **open source** e distribuito su GitHub. Puoi:
 
 **Sì, AMI è sicuro:**
 - ✅ **Open source** - codice completamente ispezionabile
-- ✅ **MIT License** - trasparente e auditabile
+- ✅ **Apache 2.0 License** - trasparente e auditabile
 - ✅ **No telemetria** - nessun dato inviato a server esterni
 - ✅ **No network shady** - solo ping ICMP e HTTP test verso host configurabili
 - ✅ **No privilegi root** - AMI NON richiede sudo

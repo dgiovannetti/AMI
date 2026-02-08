@@ -284,6 +284,10 @@ class SettingsDialog(QDialog):
         self.show_dash.setChecked(bool(ui_cfg.get('show_dashboard_on_start', True)))
         form.addRow("", self.show_dash)
 
+        self.compact_status = QCheckBox("Compact status window (visible in Dock, useful when menu bar icon is hidden)")
+        self.compact_status.setChecked(bool(ui_cfg.get('compact_status_window', True)))
+        form.addRow("", self.compact_status)
+
         self.tabs.addTab(tab, "UI")
 
     # --- Save / Build config ---
@@ -333,6 +337,7 @@ class SettingsDialog(QDialog):
         cfg.setdefault('ui', {})
         cfg['ui']['theme'] = self.theme.currentText()
         cfg['ui']['show_dashboard_on_start'] = bool(self.show_dash.isChecked())
+        cfg['ui']['compact_status_window'] = bool(self.compact_status.isChecked())
 
         self._config = cfg
 

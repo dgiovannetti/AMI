@@ -14,7 +14,7 @@ def check_requirements():
     """Check if all required packages are installed"""
     print("Checking requirements...")
     
-    required = ['PyQt6', 'requests', 'matplotlib', 'numpy', 'ping3', 'psutil', 'PIL']
+    required = ['PyQt6', 'requests', 'matplotlib', 'numpy', 'ping3', 'psutil', 'PIL', 'platformdirs']
     missing = []
     
     for package in required:
@@ -72,60 +72,77 @@ def build_executable():
     """Build the executable using PyInstaller"""
     print("\nBuilding executable...")
     
-    # Paths
-    src_dir = Path(__file__).parent / 'src'
-    resources_dir = Path(__file__).parent / 'resources'
-    config_file = Path(__file__).parent / 'config.json'
-    main_script = src_dir / 'tray_app.py'
+    root_dir = Path(__file__).parent
+    src_dir = root_dir / 'src'
+    resources_dir = root_dir / 'resources'
+    config_file = root_dir / 'config.json'
+    main_script = src_dir / 'main.py'
     icon_file = resources_dir / 'ami.ico'
+    spec_file = root_dir / 'AMI_app.spec'
     
-    # PyInstaller arguments
-    args = [
-        'pyinstaller',
-        '--name=AMI',
-        '--windowed',  # No console window
-        '--onefile',  # Single executable
-        '--noconsole' if sys.platform == 'win32' else '',  # Extra flag for Windows
-        f'--icon={icon_file}' if icon_file.exists() else '',
-        '--add-data', f'{config_file}{os.pathsep}.',  # Include config.json
-        f'--paths={src_dir}',  # Add src directory to Python path
-        '--hidden-import=ping3',
-        '--hidden-import=matplotlib',
-        '--hidden-import=numpy',
-        '--hidden-import=requests',
-        '--hidden-import=network_monitor',  # Our modules
-        '--hidden-import=logger',
-        '--hidden-import=notifier',
-        '--hidden-import=api_server',
-        '--hidden-import=updater',
-        '--hidden-import=update_dialog',
-        '--hidden-import=settings_dialog',
-        '--hidden-import=dashboard',
-        '--hidden-import=splash_screen',
-        '--hidden-import=animated_button',
-        '--collect-all=matplotlib',
-        '--noconfirm',  # Overwrite without asking
-        str(main_script)
-    ]
+    # On macOS: use spec file to create .app bundle with CFBundleName (Dock/menu bar show "AMI")
+    if sys.platform == 'darwin' and spec_file.exists():
+        print("[macOS] Using AMI_app.spec for .app bundle (Dock/menu bar will show 'AMI')")
+        args = ['pyinstaller', '--noconfirm', str(spec_file)]
+    else:
+        # Windows/Linux or no spec
+        args = [
+            'pyinstaller',
+            '--name=AMI',
+            '--windowed',
+            '--onefile',
+            '--noconsole' if sys.platform == 'win32' else '',
+            f'--icon={icon_file}' if icon_file.exists() else '',
+            '--add-data', f'{config_file}{os.pathsep}.',
+            '--add-data', f'{resources_dir}{os.pathsep}resources',
+            f'--paths={src_dir}',
+            '--hidden-import=ping3',
+            '--hidden-import=matplotlib',
+            '--hidden-import=numpy',
+            '--hidden-import=requests',
+            '--hidden-import=platformdirs',
+            '--hidden-import=core',
+            '--hidden-import=core.paths',
+            '--hidden-import=core.config',
+            '--hidden-import=core.models',
+            '--hidden-import=services',
+            '--hidden-import=services.network_monitor',
+            '--hidden-import=services.logger',
+            '--hidden-import=services.notifier',
+            '--hidden-import=services.api_server',
+            '--hidden-import=services.updater',
+            '--hidden-import=ui',
+            '--hidden-import=ui.tray_app',
+            '--hidden-import=ui.dashboard',
+            '--hidden-import=ui.splash_screen',
+            '--hidden-import=ui.settings_dialog',
+            '--hidden-import=ui.update_dialog',
+            '--hidden-import=ui.compact_status',
+            '--collect-all=matplotlib',
+            '--noconfirm',
+            str(main_script)
+        ]
     
-    # Remove empty arguments
     args = [arg for arg in args if arg]
-    
     print(f"Running: {' '.join(args)}")
     
     try:
-        result = subprocess.run(args, check=True)
+        subprocess.run(args, check=True)
         print("\n[OK] Build successful!")
         
-        # Show output location
-        dist_dir = Path(__file__).parent / 'dist'
-        exe_name = 'AMI.exe' if sys.platform == 'win32' else 'AMI'
-        exe_path = dist_dir / exe_name
+        dist_dir = root_dir / 'dist'
+        if sys.platform == 'win32':
+            exe_path = dist_dir / 'AMI.exe'
+        elif sys.platform == 'darwin' and (dist_dir / 'AMI.app').exists():
+            exe_path = dist_dir / 'AMI.app'
+            print(f"\n.app bundle created: {exe_path}")
+            return True
+        else:
+            exe_path = dist_dir / 'AMI'
         
         if exe_path.exists():
-            print(f"\nExecutable created: {exe_path}")
-            print(f"Size: {exe_path.stat().st_size / (1024*1024):.2f} MB")
-        
+            size = exe_path.stat().st_size / (1024 * 1024)
+            print(f"\nExecutable created: {exe_path} ({size:.2f} MB)")
         return True
         
     except subprocess.CalledProcessError as e:
@@ -143,11 +160,21 @@ def create_installer_package():
     # Create package directory
     package_dir.mkdir(exist_ok=True)
     
-    # Copy executable
-    exe_name = 'AMI.exe' if sys.platform == 'win32' else 'AMI'
-    exe_src = dist_dir / exe_name
+    # Copy executable (on macOS: AMI.app bundle so Dock/menu bar show "AMI")
+    if sys.platform == 'win32':
+        exe_name, exe_src = 'AMI.exe', dist_dir / 'AMI.exe'
+    elif sys.platform == 'darwin':
+        exe_name, exe_src = 'AMI.app', dist_dir / 'AMI.app'
+    else:
+        exe_name, exe_src = 'AMI', dist_dir / 'AMI'
     if exe_src.exists():
-        shutil.copy2(exe_src, package_dir / exe_name)
+        dst = package_dir / exe_name
+        if exe_src.is_dir():
+            if dst.exists():
+                shutil.rmtree(dst)
+            shutil.copytree(exe_src, dst)
+        else:
+            shutil.copy2(exe_src, dst)
         print(f"  [OK] Copied {exe_name}")
     
     # Copy config.json
@@ -187,24 +214,11 @@ def create_installer_package():
             f.write("""AMI - Active Monitor of Internet
 Quick Start Guide (macOS)
 
-IMPORTANT: AMI is a UNIX executable (not a .app bundle).
-macOS Gatekeeper will block it because it's not signed with an Apple Developer certificate.
-
-1. FIRST RUN - Choose one method:
-
-   METHOD A - Right-click (Easiest):
-   - RIGHT-CLICK (or Ctrl+click) on the AMI executable
-   - Select "Open" from the menu
-   - Click "Open" in the confirmation dialog
-   - AMI will start and appear in the menu bar
-   
-   METHOD B - Terminal:
-   - Open Terminal in the AMI-Package folder
-   - Run: xattr -cr AMI && chmod +x AMI && ./AMI
-   
-   After the first run, you can double-click AMI normally.
-   
-   See MACOS_SECURITY.md for more details and troubleshooting.
+1. FIRST RUN:
+   - Double-click AMI.app to start
+   - AMI will appear in the Dock and menu bar as "AMI"
+   - If Gatekeeper blocks: right-click AMI.app → Open → Open
+   - See MACOS_SECURITY.md for more details.
 
 2. CONFIGURATION:
    - Right-click the menu bar icon and select "Settings"
@@ -293,11 +307,13 @@ def clean_build_artifacts():
     """Clean up build artifacts"""
     print("\nCleaning build artifacts...")
     
+    root = Path(__file__).parent
     paths_to_remove = [
-        Path(__file__).parent / 'build',
-        Path(__file__).parent / 'AMI.spec',
-        Path(__file__).parent / '__pycache__',
+        root / 'build',
+        root / 'AMI.spec',
+        root / '__pycache__',
     ]
+    # Keep AMI_app.spec (used for macOS .app build)
     
     for path in paths_to_remove:
         if path.exists():

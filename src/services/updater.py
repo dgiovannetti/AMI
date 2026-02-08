@@ -19,19 +19,20 @@ from packaging import version
 class UpdateManager:
     """Manages application updates from GitHub"""
     
-    def __init__(self, current_version: str, github_repo: str):
+    def __init__(self, current_version: str, github_repo: str, max_postponements: int = 3):
         """
         Initialize update manager
         
         Args:
             current_version: Current app version (e.g., "1.0.0")
             github_repo: GitHub repository (e.g., "dgiovannetti/AMI")
+            max_postponements: Max times user can postpone (from config)
         """
         self.current_version = current_version
         self.github_repo = github_repo
         self.api_url = f"https://api.github.com/repos/{github_repo}/releases/latest"
         self.postpone_file = Path.home() / '.ami_update_postponed'
-        self.max_postponements = 3
+        self.max_postponements = max_postponements
         # Optional GitHub token for private repos
         self.token = os.environ.get('AMI_GITHUB_TOKEN') or os.environ.get('GITHUB_TOKEN')
         self.base_headers = {
@@ -85,23 +86,22 @@ class UpdateManager:
     
     def _find_platform_asset(self, assets: list) -> Optional[Dict]:
         """Find the correct download asset for current platform"""
-        platform = sys.platform
+        plat = sys.platform
         
         for asset in assets:
             name = asset['name'].lower()
             
-            if platform == 'win32' and 'windows' in name and name.endswith('.zip'):
+            if plat == 'win32' and 'windows' in name and name.endswith('.zip'):
                 return asset
-            elif platform == 'darwin' and 'macos' in name and name.endswith('.zip'):
+            elif plat == 'darwin' and 'macos' in name and name.endswith('.zip'):
                 return asset
-            elif platform.startswith('linux') and 'linux' in name and name.endswith('.zip'):
+            elif plat.startswith('linux') and 'linux' in name and name.endswith('.zip'):
                 return asset
         
         return None
     
     def _extract_checksum(self, release_body: str) -> Optional[str]:
         """Extract SHA256 checksum from release notes"""
-        # Look for lines like: SHA256: abc123...
         for line in release_body.split('\n'):
             if 'sha256' in line.lower():
                 parts = line.split(':', 1)
@@ -118,7 +118,7 @@ class UpdateManager:
             with open(self.postpone_file, 'r') as f:
                 data = json.load(f)
                 return data.get('count', 0)
-        except:
+        except Exception:
             return 0
     
     def increment_postpone_count(self):
@@ -138,30 +138,18 @@ class UpdateManager:
         return self.get_postpone_count() < self.max_postponements
     
     def download_update(self, download_url: str, checksum: Optional[str] = None) -> Optional[Path]:
-        """
-        Download update package
-        
-        Args:
-            download_url: URL to download from
-            checksum: Expected SHA256 checksum
-            
-        Returns:
-            Path to downloaded file, or None on failure
-        """
+        """Download update package"""
         try:
-            # Create temp file
             temp_dir = Path(tempfile.gettempdir()) / 'ami_update'
             temp_dir.mkdir(exist_ok=True)
             
             filename = download_url.split('/')[-1]
             download_path = temp_dir / filename
             
-            # Download with progress
             print(f"[UPDATE] Downloading from {download_url}...")
             headers = {}
             if self.token:
                 headers['Authorization'] = f'Bearer {self.token}'
-            # If using the API asset URL, request octet-stream
             if 'api.github.com' in download_url:
                 headers['Accept'] = 'application/octet-stream'
             response = requests.get(download_url, headers=headers, stream=True, timeout=30)
@@ -181,7 +169,6 @@ class UpdateManager:
             
             print("\n[UPDATE] Download complete")
             
-            # Verify checksum if provided
             if checksum:
                 if not self._verify_checksum(download_path, checksum):
                     print("[UPDATE] Checksum verification failed!")
@@ -198,28 +185,17 @@ class UpdateManager:
     def _verify_checksum(self, file_path: Path, expected_checksum: str) -> bool:
         """Verify file SHA256 checksum"""
         sha256 = hashlib.sha256()
-        
         with open(file_path, 'rb') as f:
             for chunk in iter(lambda: f.read(8192), b''):
                 sha256.update(chunk)
-        
         actual_checksum = sha256.hexdigest()
         return actual_checksum.lower() == expected_checksum.lower()
     
     def install_update(self, package_path: Path) -> bool:
-        """
-        Install downloaded update
-        
-        Args:
-            package_path: Path to downloaded ZIP package
-            
-        Returns:
-            True if installation successful
-        """
+        """Install downloaded update"""
         try:
             import zipfile
             
-            # Extract to temp directory
             extract_dir = package_path.parent / 'extracted'
             extract_dir.mkdir(exist_ok=True)
             
@@ -227,7 +203,6 @@ class UpdateManager:
             with zipfile.ZipFile(package_path, 'r') as zip_ref:
                 zip_ref.extractall(extract_dir)
             
-            # Find the new executable
             if sys.platform == 'win32':
                 new_exe = self._find_file(extract_dir, 'AMI.exe')
             else:
@@ -237,15 +212,12 @@ class UpdateManager:
                 print("[UPDATE] Could not find executable in package")
                 return False
             
-            # Get current executable path
             if getattr(sys, 'frozen', False):
                 current_exe = Path(sys.executable)
             else:
-                # Running from source - can't update
                 print("[UPDATE] Cannot update when running from source")
                 return False
             
-            # Prepare update script
             if sys.platform == 'win32':
                 return self._install_windows(current_exe, new_exe)
             else:
@@ -264,14 +236,11 @@ class UpdateManager:
     
     def _install_windows(self, current_exe: Path, new_exe: Path) -> bool:
         """Install update on Windows"""
-        # Create batch script to replace exe and restart
         batch_script = current_exe.parent / '_update.bat'
         pid = os.getpid()
-
         batch_content = f"""@echo off
 set PID={pid}
 echo Updating AMI...
-REM Wait for current process to exit
 :waitpid
 tasklist /FI "PID eq %PID%" | findstr /I "%PID%" >nul
 if %errorlevel%==0 (
@@ -283,26 +252,19 @@ move /y "{new_exe}" "{current_exe}"
 start "" "{current_exe}"
 del "%~f0"
 """
-        
         with open(batch_script, 'w') as f:
             f.write(batch_content)
-        
-        # Run batch script and exit
-        subprocess.Popen(['cmd', '/c', str(batch_script)], 
+        subprocess.Popen(['cmd', '/c', str(batch_script)],
                         creationflags=subprocess.CREATE_NO_WINDOW)
-        
         return True
     
     def _install_unix(self, current_exe: Path, new_exe: Path) -> bool:
         """Install update on Unix/macOS"""
-        # Create shell script to replace exe and restart
         script_path = current_exe.parent / '_update.sh'
         pid = os.getpid()
-
         script_content = f"""#!/bin/bash
 PID={pid}
 echo "Updating AMI..."
-# Wait up to ~10s for current process to exit
 for i in $(seq 1 50); do
   if kill -0 "$PID" 2>/dev/null; then
     sleep 0.2
@@ -317,47 +279,25 @@ chmod +x "{current_exe}"
 "{current_exe}" &
 rm "$0"
 """
-        
         with open(script_path, 'w') as f:
             f.write(script_content)
-        
         os.chmod(script_path, 0o755)
-        
-        # Run script and exit
         subprocess.Popen(['/bin/bash', str(script_path)])
-        
         return True
     
     def perform_update(self, update_info: Dict) -> bool:
-        """
-        Complete update process: download and install
-        
-        Args:
-            update_info: Update information from check_for_updates()
-            
-        Returns:
-            True if update successful (app will restart)
-        """
-        # Download
+        """Complete update process: download and install"""
         package_path = self.download_update(
             update_info['download_url'],
             update_info.get('checksum')
         )
-        
         if not package_path:
             return False
-        
-        # Install
         success = self.install_update(package_path)
-        
         if success:
-            # Reset postpone count
             self.reset_postpone_count()
-            
-            # Exit app (update script will restart it)
             print("[UPDATE] Update installed. Restarting...")
             sys.exit(0)
-        
         return success
 
 
