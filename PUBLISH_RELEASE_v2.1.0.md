@@ -1,6 +1,8 @@
 # 📦 Publish Release v2.1.0 on GitHub / Pubblicare Release v2.1.0 su GitHub
 
-## 1. Build (già fatto)
+> **Reminder / Promemoria**: Release notes and documentation: always in **English + Italian** (EN/IT).
+
+## 1. Build (già fatto / done)
 
 ```bash
 python build.py

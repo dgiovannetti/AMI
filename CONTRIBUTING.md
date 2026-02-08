@@ -79,6 +79,7 @@ AMI/
 - Update README.md for user-facing changes
 - Update docstrings for code changes
 - Add comments for complex logic
+- **Release notes and public docs**: always provide **English + Italian** (EN/IT)
 
 ## 🧪 Testing
 
