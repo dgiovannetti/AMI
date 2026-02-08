@@ -113,8 +113,8 @@ app = BUNDLE(
     info_plist={
         'CFBundleName': 'AMI',
         'CFBundleDisplayName': 'AMI - Active Monitor of Internet',
-        'CFBundleVersion': '2.0.0',
-        'CFBundleShortVersionString': '2.0.0',
+        'CFBundleVersion': '2.1.0',
+        'CFBundleShortVersionString': '2.1.0',
         'NSHighResolutionCapable': True,
         'LSUIElement': False,  # Show in Dock
         'NSRequiresAquaSystemAppearance': False,

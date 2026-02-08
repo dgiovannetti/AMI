@@ -98,8 +98,8 @@ exe = EXE(
 # UTF-8
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(2, 0, 0, 0),
-    prodvers=(2, 0, 0, 0),
+    filevers=(2, 1, 0, 0),
+    prodvers=(2, 1, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -114,12 +114,12 @@ VSVersionInfo(
         u'040904B0',
         [StringStruct(u'CompanyName', u'CiaoIM™ by Daniel Giovannetti'),
         StringStruct(u'FileDescription', u'AMI - Active Monitor of Internet'),
-        StringStruct(u'FileVersion', u'2.0.0'),
+        StringStruct(u'FileVersion', u'2.1.0'),
         StringStruct(u'InternalName', u'AMI'),
         StringStruct(u'LegalCopyright', u'© 2025 CiaoIM™ by Daniel Giovannetti. Apache 2.0 License'),
         StringStruct(u'OriginalFilename', u'AMI.exe'),
         StringStruct(u'ProductName', u'AMI'),
-        StringStruct(u'ProductVersion', u'2.0.0')])
+        StringStruct(u'ProductVersion', u'2.1.0')])
       ]),
     VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
   ]
@@ -233,7 +233,7 @@ def create_nsis_installer(root_dir):
 ; Nullsoft Scriptable Install System
 
 !define APP_NAME "AMI"
-!define APP_VERSION "2.0.0"
+!define APP_VERSION "2.1.0"
 !define APP_PUBLISHER "CiaoIM™ by Daniel Giovannetti"
 !define APP_URL "https://github.com/dgiovannetti/AMI"
 !define APP_EXE "AMI.exe"
