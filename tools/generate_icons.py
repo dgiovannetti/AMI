@@ -1,10 +1,76 @@
 """
 Icon Generator for AMI
-Creates application icons in various formats and colors
+Creates application icons in various formats and colors.
+Status icons include checkmark, !, X symbols drawn as vector shapes (no font dependency).
 """
 
 from PIL import Image, ImageDraw
 import os
+
+
+def _draw_checkmark(draw, cx, cy, scale, line_width, color=(255, 255, 255)):
+    """Draw checkmark (✓) as polyline - no font needed."""
+    # Classic check: bottom-left -> middle -> top-right
+    pts = [
+        (cx - scale * 0.5, cy + scale * 0.25),
+        (cx - scale * 0.12, cy + scale * 0.02),
+        (cx + scale * 0.48, cy - scale * 0.48),
+    ]
+    draw.line(pts, fill=color, width=line_width, joint="curve")
+
+
+def _draw_exclamation(draw, cx, cy, scale, line_width, color=(255, 255, 255)):
+    """Draw exclamation (!) as vertical line + dot - no font needed."""
+    # Vertical line
+    top_y = cy - scale * 0.45
+    mid_y = cy + scale * 0.15
+    draw.line([(cx, top_y), (cx, mid_y)], fill=color, width=line_width)
+    # Dot at bottom
+    dot_r = max(2, scale // 6)
+    draw.ellipse([cx - dot_r, cy + scale * 0.2, cx + dot_r, cy + scale * 0.2 + dot_r * 2], fill=color)
+
+
+def _draw_x(draw, cx, cy, scale, line_width, color=(255, 255, 255)):
+    """Draw X as two diagonal lines - no font needed."""
+    s = scale * 0.45
+    draw.line([(cx - s, cy - s), (cx + s, cy + s)], fill=color, width=line_width)
+    draw.line([(cx + s, cy - s), (cx - s, cy + s)], fill=color, width=line_width)
+
+
+def create_status_icon_with_symbol(size=64, color=(0, 200, 0), symbol_type='check'):
+    """
+    Create tray status icon: colored circle + symbol drawn as vector shapes.
+    No font dependency - symbols always render correctly.
+    
+    Args:
+        size: Icon size in pixels
+        color: RGB tuple for circle color
+        symbol_type: 'check' (✓), 'exclamation' (!), 'x' (✕)
+    
+    Returns:
+        PIL Image object
+    """
+    img = Image.new('RGBA', (size, size), (255, 255, 255, 0))
+    draw = ImageDraw.Draw(img)
+    
+    # Filled circle (almost full size)
+    margin = size // 16
+    draw.ellipse([margin, margin, size - margin, size - margin], fill=color, outline=None)
+    
+    # Draw symbol as vector - scale for icon size
+    cx, cy = size // 2, size // 2
+    scale = size * 0.4
+    line_width = max(2, size // 12)
+    white = (255, 255, 255)
+    
+    if symbol_type == 'check':
+        _draw_checkmark(draw, cx, cy, scale, line_width, white)
+    elif symbol_type == 'exclamation':
+        _draw_exclamation(draw, cx, cy, scale, line_width, white)
+    elif symbol_type == 'x':
+        _draw_x(draw, cx, cy, scale, line_width, white)
+    
+    return img
 
 
 def create_wifi_icon(size=256, color=(0, 200, 0), bg_color=(255, 255, 255, 0)):
@@ -171,12 +237,16 @@ def save_icon_set(output_dir='../resources'):
         sizes=[(s, s) for s in [16, 32, 48, 64, 128, 256]]
     )
     
-    # Generate status icons (simple circular)
-    for color_name, color_value in colors.items():
+    # Generate status icons (circle + symbol drawn as vector - no font)
+    # Colors match tray_app.py: green=✓, yellow=!, red=✕
+    status_config = [
+        ('green', (16, 185, 129), 'check'),       # Green-500, online
+        ('yellow', (245, 158, 11), 'exclamation'),  # Amber-500, unstable
+        ('red', (239, 68, 68), 'x'),              # Red-500, offline
+    ]
+    for color_name, color_value, symbol_type in status_config:
         print(f"  Creating {color_name} status icons...")
-        
-        # PNG
-        icon = create_simple_icon(64, color_value)
+        icon = create_status_icon_with_symbol(64, color_value, symbol_type)
         icon.save(os.path.join(output_dir, f'status_{color_name}.png'))
     
     # Generate logo for about dialog

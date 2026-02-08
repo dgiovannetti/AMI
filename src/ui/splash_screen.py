@@ -14,7 +14,7 @@ import sys
 class UltraModernSplashScreen(QSplashScreen):
     """Ultra professional enterprise splash screen"""
 
-    def __init__(self, version: str = "2.1.0"):
+    def __init__(self, version: str = "2.1.1"):
         self._version = version
         pixmap = QPixmap(480, 300)
         pixmap.fill(Qt.GlobalColor.transparent)

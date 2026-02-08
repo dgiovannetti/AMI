@@ -17,7 +17,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "app": {
         "name": "AMI",
         "subtitle": "Active Monitor of Internet",
-        "version": "2.1.0",
+        "version": "2.1.1",
         "copyright": "© 2025 CiaoIM™ by Daniel Giovannetti",
         "website": "ciaoim.tech",
         "tagline": "Crafted logic. Measured force. Front-end vision, compiled systems, and hardcoded ethics.",

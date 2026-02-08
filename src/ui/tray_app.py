@@ -62,7 +62,7 @@ class SystemTrayApp:
         self.config = self.load_config()
         
         # Show splash screen (with version from config)
-        app_version = self.config.get('app', {}).get('version', '2.1.0')
+        app_version = self.config.get('app', {}).get('version', '2.1.1')
         self.splash = UltraModernSplashScreen(version=app_version)
         self.splash.show()
         self.splash.showMessage("Loading configuration...")
@@ -170,8 +170,11 @@ class SystemTrayApp:
         # Reference to dashboard window (will be created on demand)
         self.dashboard = None
         
-        # Close splash screen with fade out (3 seconds display)
-        QTimer.singleShot(3000, self.close_splash)
+        # Splash: close when first status is received (after 1.5s min) or after 3s max
+        self._splash_closed = False
+        self._splash_closable = False
+        QTimer.singleShot(1500, self._allow_splash_close_on_status)
+        QTimer.singleShot(3000, self.close_splash)  # Fallback: close after 3s regardless
         
         # Show dashboard on start if configured or forced via env variable
         show_dashboard = (
@@ -179,10 +182,19 @@ class SystemTrayApp:
             os.environ.get('AMI_FORCE_DASHBOARD') == '1'
         )
         if show_dashboard:
-            QTimer.singleShot(3500, self.show_dashboard)  # Delay 3.5s for splash to close
+            QTimer.singleShot(2500, self.show_dashboard)  # Delay 2.5s (after min splash)
+    
+    def _allow_splash_close_on_status(self):
+        """Allow splash to close when first status is received (after 1.5s min display)"""
+        self._splash_closable = True
+        if self.current_status and not self._splash_closed:
+            self.close_splash()
     
     def close_splash(self):
-        """Close splash screen with animation"""
+        """Close splash screen with animation (guarded against double-close)"""
+        if self._splash_closed:
+            return
+        self._splash_closed = True
         if hasattr(self, 'splash'):
             self.splash.fade_out()
     
@@ -562,6 +574,10 @@ class SystemTrayApp:
             status: ConnectionStatus object
         """
         self.current_status = status
+        
+        # Close splash on first status (after minimum 1.5s display)
+        if getattr(self, '_splash_closable', False) and not getattr(self, '_splash_closed', True):
+            self.close_splash()
         
         # Update UI
         self.update_icon(status.status)

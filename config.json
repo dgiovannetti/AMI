@@ -2,7 +2,7 @@
   "app": {
     "name": "AMI",
     "subtitle": "Active Monitor of Internet",
-    "version": "2.1.0",
+    "version": "2.1.1",
     "copyright": "© 2025 CiaoIM™ by Daniel Giovannetti",
     "website": "ciaoim.tech",
     "tagline": "Crafted logic. Measured force. Front-end vision, compiled systems, and hardcoded ethics.",
@@ -46,7 +46,7 @@
   },
   "ui": {
     "theme": "auto",
-    "show_dashboard_on_start": true
+    "show_dashboard_on_start": false
   },
   "updates": {
     "enabled": true,

@@ -303,22 +303,24 @@ class NetworkMonitor:
             # Analyze results
             status = self.analyze_connection(ping_results, http_ok, local_ok)
 
-        # Refresh ISP info at most every 30 minutes or on IP change
-        try:
-            isp_info = self._get_public_network_info()
-            if isp_info:
-                status.public_ip = isp_info.get('ip')
-                status.isp = isp_info.get('isp')
-        except Exception:
-            pass
+        # Skip ISP/VPN on first check for faster startup - show base status first
+        if self.total_checks > 1:
+            # Refresh ISP info at most every 30 minutes or on IP change
+            try:
+                isp_info = self._get_public_network_info()
+                if isp_info:
+                    status.public_ip = isp_info.get('ip')
+                    status.isp = isp_info.get('isp')
+            except Exception:
+                pass
 
-        # Refresh VPN detection at most every 10 seconds
-        try:
-            vpn_connected, vpn_hint = self._detect_vpn(status.isp)
-            status.vpn_connected = vpn_connected
-            status.vpn_provider = vpn_hint
-        except Exception:
-            pass
+            # Refresh VPN detection at most every 10 seconds
+            try:
+                vpn_connected, vpn_hint = self._detect_vpn(status.isp)
+                status.vpn_connected = vpn_connected
+                status.vpn_provider = vpn_hint
+            except Exception:
+                pass
         
         # Update statistics
         if status.status in ['online', 'unstable']:

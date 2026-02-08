@@ -85,15 +85,13 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='AMI',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,  # Faster startup (no decompression at runtime)
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
@@ -105,16 +103,27 @@ exe = EXE(
     icon='resources/ami.icns' if os.path.exists('resources/ami.icns') else None,
 )
 
-app = BUNDLE(
+coll = COLLECT(
     exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,  # Faster startup (no decompression at runtime)
+    upx_exclude=[],
+    name='AMI',
+)
+
+app = BUNDLE(
+    coll,
     name='AMI.app',
     icon='resources/ami.icns' if os.path.exists('resources/ami.icns') else None,
     bundle_identifier='tech.ciaoim.ami',
     info_plist={
         'CFBundleName': 'AMI',
         'CFBundleDisplayName': 'AMI - Active Monitor of Internet',
-        'CFBundleVersion': '2.1.0',
-        'CFBundleShortVersionString': '2.1.0',
+        'CFBundleVersion': '2.1.1',
+        'CFBundleShortVersionString': '2.1.1',
         'NSHighResolutionCapable': True,
         'LSUIElement': False,  # Show in Dock
         'NSRequiresAquaSystemAppearance': False,
