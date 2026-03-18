@@ -48,7 +48,7 @@ class APIHandler(BaseHTTPRequestHandler):
             self.send_json_response({"error": "No status available yet"}, 503)
             return
         status = monitor.last_status
-        self.send_json_response({
+        payload = {
             "status": status.status,
             "timestamp": status.timestamp.isoformat(),
             "avg_latency_ms": status.avg_latency_ms,
@@ -57,11 +57,16 @@ class APIHandler(BaseHTTPRequestHandler):
             "local_network_ok": status.local_network_ok,
             "internet_ok": status.internet_ok,
             "http_test_ok": status.http_test_ok,
-        })
+        }
+        if getattr(status, "speed_mbps", None) is not None:
+            payload["speed_mbps"] = status.speed_mbps
+        if getattr(status, "speed_tier", None) is not None:
+            payload["speed_tier"] = status.speed_tier
+        self.send_json_response(payload)
 
     def send_health(self):
         _, config, _ = self._get_server_attrs()
-        version = "3.0.0"
+        version = "3.1.0"
         if config:
             version = config.get("app", {}).get("version", version)
         self.send_json_response({

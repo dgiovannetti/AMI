@@ -47,6 +47,7 @@ class SettingsDialog(QDialog):
         self._init_notifications_tab()
         self._init_logging_tab()
         self._init_api_tab()
+        self._init_speed_test_tab()
         self._init_ui_tab()
         btn_row = QHBoxLayout()
         btn_row.addStretch()
@@ -166,6 +167,45 @@ class SettingsDialog(QDialog):
         layout.addRow("Auth token:", self.api_token)
         self.tabs.addTab(tab, "API")
 
+    def _init_speed_test_tab(self) -> None:
+        tab = QWidget()
+        layout = QFormLayout(tab)
+        layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        st = self._config.get("speed_test", {})
+        self.speed_test_enabled = QCheckBox("Enable speed test (download throughput)")
+        self.speed_test_enabled.setChecked(bool(st.get("enabled", True)))
+        layout.addRow("", self.speed_test_enabled)
+        self.speed_test_interval = QSpinBox()
+        self.speed_test_interval.setRange(5, 1440)
+        self.speed_test_interval.setValue(int(st.get("interval_minutes", 30)))
+        self.speed_test_interval.setSuffix(" min")
+        layout.addRow("Interval:", self.speed_test_interval)
+        self.speed_test_timeout = QSpinBox()
+        self.speed_test_timeout.setRange(5, 120)
+        self.speed_test_timeout.setValue(int(st.get("timeout_seconds", 30)))
+        self.speed_test_timeout.setSuffix(" s")
+        layout.addRow("Timeout:", self.speed_test_timeout)
+        self.speed_test_url = QLineEdit(st.get("test_url", "https://speed.cloudflare.com/__down?bytes=52428800"))
+        self.speed_test_url.setPlaceholderText("e.g. https://speed.cloudflare.com/__down?bytes=52428800")
+        layout.addRow("Test URL:", self.speed_test_url)
+        self.speed_test_size_mb = QDoubleSpinBox()
+        self.speed_test_size_mb.setRange(1, 50)
+        self.speed_test_size_mb.setDecimals(1)
+        self.speed_test_size_mb.setValue(float(st.get("download_size_mb", 10)))
+        self.speed_test_size_mb.setSuffix(" MB")
+        layout.addRow("Download size:", self.speed_test_size_mb)
+        self.speed_test_tier_low = QSpinBox()
+        self.speed_test_tier_low.setRange(1, 10000)
+        self.speed_test_tier_low.setValue(int(st.get("tier_low_mbps", 100)))
+        self.speed_test_tier_low.setSuffix(" Mbps")
+        layout.addRow("Tier low (Slow < this):", self.speed_test_tier_low)
+        self.speed_test_tier_high = QSpinBox()
+        self.speed_test_tier_high.setRange(1, 100000)
+        self.speed_test_tier_high.setValue(int(st.get("tier_high_mbps", 1000)))
+        self.speed_test_tier_high.setSuffix(" Mbps")
+        layout.addRow("Tier high (Fast ≥ this):", self.speed_test_tier_high)
+        self.tabs.addTab(tab, "Speed test")
+
     def _init_ui_tab(self) -> None:
         tab = QWidget()
         form = QFormLayout(tab)
@@ -189,6 +229,13 @@ class SettingsDialog(QDialog):
         if not hosts:
             QMessageBox.warning(self, "Validation", "Please specify at least one ping host.")
             return
+        if self.speed_test_enabled.isChecked():
+            if not self.speed_test_url.text().strip():
+                QMessageBox.warning(self, "Validation", "Speed test enabled: please set a test URL.")
+                return
+            if self.speed_test_tier_low.value() >= self.speed_test_tier_high.value():
+                QMessageBox.warning(self, "Validation", "Tier low (Mbps) must be less than tier high.")
+                return
         self.accept()
 
     def _build_config(self) -> None:
@@ -216,6 +263,14 @@ class SettingsDialog(QDialog):
         cfg["api"]["enabled"] = bool(self.api_enabled.isChecked())
         cfg["api"]["port"] = int(self.api_port.value())
         cfg["api"]["auth_token"] = self.api_token.text().strip()
+        cfg.setdefault("speed_test", {})
+        cfg["speed_test"]["enabled"] = bool(self.speed_test_enabled.isChecked())
+        cfg["speed_test"]["interval_minutes"] = int(self.speed_test_interval.value())
+        cfg["speed_test"]["timeout_seconds"] = int(self.speed_test_timeout.value())
+        cfg["speed_test"]["test_url"] = self.speed_test_url.text().strip()
+        cfg["speed_test"]["download_size_mb"] = float(self.speed_test_size_mb.value())
+        cfg["speed_test"]["tier_low_mbps"] = int(self.speed_test_tier_low.value())
+        cfg["speed_test"]["tier_high_mbps"] = int(self.speed_test_tier_high.value())
         cfg.setdefault("ui", {})
         cfg["ui"]["theme"] = self.theme.currentText()
         cfg["ui"]["show_dashboard_on_start"] = bool(self.show_dash.isChecked())

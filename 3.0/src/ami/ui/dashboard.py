@@ -136,7 +136,8 @@ class EnterpriseDashboard(QMainWindow):
         self.card_latency = StatCard("Average Latency", "#3b82f6", "--", self._dark)
         self.card_uptime = StatCard("Uptime", "#8b5cf6", "--", self._dark)
         self.card_success = StatCard("Success Rate", "#f59e0b", "--", self._dark)
-        self.status_cards = [self.card_status, self.card_latency, self.card_uptime, self.card_success]
+        self.card_speed = StatCard("Download", "#94a3b8", "--", self._dark)
+        self.status_cards = [self.card_status, self.card_latency, self.card_uptime, self.card_success, self.card_speed]
         for i, card in enumerate(self.status_cards):
             self.status_grid.addWidget(card, i // 4, i % 4)
         content_layout.addLayout(self.status_grid)
@@ -228,6 +229,18 @@ class EnterpriseDashboard(QMainWindow):
         self.card_uptime.set_value(f"{uptime_pct:.1f}%" if uptime_pct is not None else "N/A")
         success_pct = (status.successful_pings / status.total_pings * 100) if getattr(status, "total_pings", 0) > 0 else None
         self.card_success.set_value(f"{success_pct:.1f}%" if success_pct is not None else "N/A")
+        speed_mbps = getattr(status, "speed_mbps", None)
+        speed_tier = getattr(status, "speed_tier", None)
+        if speed_tier is not None and speed_mbps is not None:
+            if speed_mbps >= 1000:
+                self.card_speed.set_value(f"{speed_mbps / 1000:.2f} Gbps")
+            else:
+                self.card_speed.set_value(f"{speed_mbps:.0f} Mbps")
+            tier_colors = {"fast": "#34d399", "medium": "#f59e0b", "slow": "#ef4444"}
+            self.card_speed.set_accent_color(tier_colors.get(speed_tier, "#94a3b8"))
+        else:
+            self.card_speed.set_value("—")
+            self.card_speed.set_accent_color("#94a3b8")
         try:
             if status.status == "online":
                 light, color = "✓", "#34d399"

@@ -4,6 +4,7 @@ AMI 3.0 - System tray application: menu, monitoring timer, lazy dashboard.
 
 import os
 import sys
+import threading
 from pathlib import Path
 
 from PyQt6.QtCore import QTimer, Qt, QThread, pyqtSignal
@@ -22,6 +23,7 @@ from ami.services.api_server import APIServer
 from ami.services.logger import EventLogger
 from ami.services.network_monitor import NetworkMonitor
 from ami.services.notifier import Notifier
+from ami.services.speed_test import run_speed_test
 from ami.services.updater import UpdateManager
 from ami.ui.compact_status import CompactStatusWindow
 from ami.ui.settings_dialog import SettingsDialog
@@ -114,6 +116,14 @@ class SystemTrayApp:
             self.compact_status.show()
         self.check_connection()
         self.dashboard = None
+        self.speed_test_timer = None
+        st_cfg = self.config.get("speed_test", {})
+        if st_cfg.get("enabled", False):
+            interval_ms = int(st_cfg.get("interval_minutes", 30)) * 60 * 1000
+            self.speed_test_timer = QTimer()
+            self.speed_test_timer.timeout.connect(self._run_speed_test)
+            self.speed_test_timer.start(interval_ms)
+            QTimer.singleShot(60000, self._run_speed_test)
         self._splash_closed = False
         self._splash_closable = False
         QTimer.singleShot(1500, self._allow_splash_close)
@@ -189,6 +199,16 @@ class SystemTrayApp:
         elif not use_compact and getattr(self, "compact_status", None):
             self.compact_status.close()
             self.compact_status = None
+        if getattr(self, "speed_test_timer", None):
+            self.speed_test_timer.stop()
+        st_cfg = new_config.get("speed_test", {})
+        if st_cfg.get("enabled", False):
+            interval_ms = int(st_cfg.get("interval_minutes", 30)) * 60 * 1000
+            self.speed_test_timer = QTimer()
+            self.speed_test_timer.timeout.connect(self._run_speed_test)
+            self.speed_test_timer.start(interval_ms)
+        else:
+            self.speed_test_timer = None
 
     def create_menu(self) -> None:
         self._tray_menu = QMenu()
@@ -208,6 +228,9 @@ class SystemTrayApp:
         self.vpn_action = QAction("VPN: --", menu)
         self.vpn_action.setEnabled(False)
         menu.addAction(self.vpn_action)
+        self.speed_action = QAction("Speed: --", menu)
+        self.speed_action.setEnabled(False)
+        menu.addAction(self.speed_action)
         menu.addSeparator()
         menu.addAction("🔄 Test Now").triggered.connect(self.manual_test)
         menu.addAction("📊 Dashboard").triggered.connect(self.show_dashboard)
@@ -264,6 +287,15 @@ class SystemTrayApp:
             parts.append(f"ISP: {status.isp}" + (f" ({status.public_ip})" if getattr(status, "public_ip", None) else ""))
         if getattr(status, "vpn_connected", None) is not None:
             parts.append("VPN: ON" if status.vpn_connected else "VPN: OFF")
+        speed_mbps = getattr(status, "speed_mbps", None)
+        speed_tier = getattr(status, "speed_tier", None)
+        if speed_tier is not None and speed_mbps is not None:
+            if speed_mbps >= 1000:
+                parts.append(f"Speed: {speed_mbps / 1000:.2f} Gbps ({speed_tier.capitalize()})")
+            else:
+                parts.append(f"Speed: {speed_mbps:.0f} Mbps ({speed_tier.capitalize()})")
+        else:
+            parts.append("Speed: —")
         self.tray_icon.setToolTip("\n".join(parts))
 
     def update_menu_info(self, status) -> None:
@@ -278,6 +310,15 @@ class SystemTrayApp:
             self.vpn_action.setText("VPN: ON" + (f" [{status.vpn_provider}]" if getattr(status, "vpn_provider", None) else "") if getattr(status, "vpn_connected", None) else "VPN: OFF")
         except Exception:
             self.vpn_action.setText("VPN: Unknown")
+        speed_mbps = getattr(status, "speed_mbps", None)
+        speed_tier = getattr(status, "speed_tier", None)
+        if speed_tier is not None and speed_mbps is not None:
+            if speed_mbps >= 1000:
+                self.speed_action.setText(f"Speed: {speed_mbps / 1000:.2f} Gbps ({speed_tier.capitalize()})")
+            else:
+                self.speed_action.setText(f"Speed: {speed_mbps:.0f} Mbps ({speed_tier.capitalize()})")
+        else:
+            self.speed_action.setText("Speed: —")
 
     def check_connection(self) -> None:
         if self.monitor_thread is not None:
@@ -316,6 +357,27 @@ class SystemTrayApp:
             self.dashboard.update_data(status, self.monitor.get_statistics())
         if self.compact_status:
             self.compact_status.update_status(status)
+
+    def _run_speed_test(self) -> None:
+        st_cfg = self.config.get("speed_test", {})
+        if not st_cfg.get("enabled", False):
+            return
+        if self.current_status is None or self.current_status.status == "offline":
+            return
+        url = st_cfg.get("test_url", "").strip()
+        if not url:
+            return
+        size_mb = float(st_cfg.get("download_size_mb", 10))
+        timeout = int(st_cfg.get("timeout_seconds", 30))
+        low = float(st_cfg.get("tier_low_mbps", 100))
+        high = float(st_cfg.get("tier_high_mbps", 1000))
+        monitor = self.monitor
+
+        def run() -> None:
+            mbps, tier = run_speed_test(url, size_mb, timeout, low, high)
+            monitor.set_speed_result(mbps, tier)
+
+        threading.Thread(target=run, daemon=True).start()
 
     def manual_test(self) -> None:
         self.tray_icon.showMessage("AMI", "Running connection test...", QSystemTrayIcon.MessageIcon.Information, 2000)
@@ -404,6 +466,8 @@ class SystemTrayApp:
         self.timer.stop()
         if getattr(self, "update_timer", None):
             self.update_timer.stop()
+        if getattr(self, "speed_test_timer", None):
+            self.speed_test_timer.stop()
         if self.monitor_thread is not None:
             try:
                 if self.monitor_thread.isRunning():

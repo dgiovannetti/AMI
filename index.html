@@ -3,780 +3,561 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="AMI - Active Monitor of Internet. Sai se sei davvero online. Modern, accessible network monitoring with colorblind-friendly design. Apache 2.0 licensed.">
-    <title>AMI - Active Monitor of Internet</title>
+    <meta name="description" content="AMI 3.0 - Active Monitor of Internet. Sai se sei davvero online. Monitor di rete in tempo reale con temi light/dark, API opzionale, design accessibile. Apache 2.0.">
+    <title>AMI 3.0 - Active Monitor of Internet</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --bg-light: #F9FAFB;
-            --bg-card: #FFFFFF;
-            --accent-green: #10B981;
-            --accent-blue: #3B82F6;
-            --accent-purple: #8B5CF6;
-            --accent-orange: #F59E0B;
-            --accent-yellow: #F59E0B;
-            --text-primary: #111827;
-            --text-secondary: #6B7280;
-            --border: #E5E7EB;
+            --bg: #0a0a0f;
+            --bg-elevated: #12121a;
+            --bg-card: #16161f;
+            --border: #2a2a3a;
+            --text: #f0f0f5;
+            --text-muted: #8888a0;
+            --accent: #22c55e;
+            --accent-hover: #16a34a;
+            --blue: #3b82f6;
+            --amber: #f59e0b;
+            --red: #ef4444;
         }
 
+        html { scroll-behavior: smooth; }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', sans-serif;
-            background: var(--bg-light);
-            color: var(--text-primary);
-            line-height: 1.6;
+            font-family: 'DM Sans', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.65;
             overflow-x: hidden;
         }
 
-        /* Hero Section */
+        .container { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem; }
+
+        /* Header / Nav */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 1rem 0;
+            background: rgba(10, 10, 15, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+        }
+        header .container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .logo {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 1.35rem;
+            letter-spacing: -0.03em;
+            color: var(--text);
+        }
+        .logo span { color: var(--accent); }
+        nav { display: flex; gap: 1.5rem; align-items: center; }
+        nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        nav a:hover { color: var(--accent); }
+        .btn-nav {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 1rem;
+            background: var(--accent);
+            color: #000;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .btn-nav:hover { background: var(--accent-hover); color: #000; }
+
+        /* Hero */
         .hero {
             min-height: 100vh;
             display: flex;
             align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #FFFFFF 0%, #F9FAFB 100%);
+            padding-top: 4rem;
             position: relative;
-            overflow: hidden;
         }
-
-        .hero::before {
-            content: '';
-            position: absolute;
-            width: 500px;
-            height: 500px;
-            background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
-            top: -200px;
-            right: -200px;
-            animation: pulse 8s ease-in-out infinite;
-        }
-
         .hero::after {
             content: '';
             position: absolute;
-            width: 400px;
-            height: 400px;
-            background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%);
-            bottom: -150px;
-            left: -150px;
-            animation: pulse 6s ease-in-out infinite reverse;
+            width: 60%;
+            height: 70%;
+            top: 10%;
+            right: -10%;
+            background: radial-gradient(ellipse, rgba(34, 197, 94, 0.08) 0%, transparent 60%);
+            pointer-events: none;
         }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 0.5; }
-            50% { transform: scale(1.2); opacity: 0.8; }
+        .hero-content { position: relative; z-index: 1; }
+        .badge {
+            display: inline-block;
+            padding: 0.35rem 0.75rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
         }
-
-        .hero-content {
-            text-align: center;
-            z-index: 1;
-            padding: 2rem;
-            max-width: 900px;
-        }
-
-        .logo-circle {
-            width: 120px;
-            height: 120px;
-            margin: 0 auto 2rem;
-            background: linear-gradient(135deg, var(--accent-blue), var(--accent-green));
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 3rem;
-            font-weight: bold;
-            color: white;
-            box-shadow: 0 10px 40px rgba(59, 130, 246, 0.2);
-            animation: float 3s ease-in-out infinite;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-20px); }
-        }
-
-        h1 {
-            font-size: 4rem;
-            font-weight: 800;
+        .badge strong { color: var(--accent); }
+        .hero h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(2.5rem, 6vw, 4rem);
+            font-weight: 700;
+            letter-spacing: -0.04em;
+            line-height: 1.1;
             margin-bottom: 1rem;
-            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+        }
+        .hero h1 .gradient {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--blue) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            animation: fadeInUp 0.8s ease-out;
         }
-
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
         .tagline {
-            font-size: 1.5rem;
-            color: var(--text-secondary);
+            font-size: 1.35rem;
+            color: var(--text-muted);
             font-style: italic;
-            margin-bottom: 2rem;
-            animation: fadeInUp 0.8s ease-out 0.2s both;
+            margin-bottom: 1.5rem;
         }
-
-        .subtitle {
-            font-size: 1.2rem;
-            color: var(--text-secondary);
-            margin-bottom: 3rem;
-            max-width: 700px;
-            margin-left: auto;
-            margin-right: auto;
-            animation: fadeInUp 0.8s ease-out 0.4s both;
+        .hero-sub {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            max-width: 540px;
+            margin-bottom: 2.5rem;
         }
-
-        .cta-buttons {
+        .cta-row {
             display: flex;
-            gap: 1rem;
-            justify-content: center;
             flex-wrap: wrap;
-            animation: fadeInUp 0.8s ease-out 0.6s both;
+            gap: 1rem;
         }
-
         .btn {
-            padding: 1rem 2.5rem;
-            border-radius: 12px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            text-decoration: none;
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            transition: all 0.3s ease;
-            border: 2px solid transparent;
-        }
-
-        .os-icon {
-            width: 20px;
-            height: 20px;
-            fill: currentColor;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
-            color: white;
-            box-shadow: 0 4px 20px rgba(52, 211, 153, 0.4);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px) scale(1.02);
-            box-shadow: 0 8px 40px rgba(52, 211, 153, 0.6);
-        }
-
-        .btn-primary:active {
-            transform: translateY(0) scale(0.98);
-        }
-
-        .btn-secondary {
-            background: transparent;
-            color: var(--text-primary);
-            border-color: var(--border);
-        }
-
-        .btn-secondary:hover {
-            border-color: var(--accent-blue);
-            background: rgba(96, 165, 250, 0.1);
-            transform: translateY(-2px);
-        }
-
-        .btn-secondary:active {
-            transform: translateY(0);
-        }
-
-        /* Status Indicators */
-        .status-preview {
-            display: flex;
-            gap: 1.5rem;
-            justify-content: center;
-            margin-top: 3rem;
-        }
-
-        .status-badge {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.75rem 1.5rem;
-            background: var(--bg-card);
-            border-radius: 30px;
-            border: 1px solid var(--border);
-            font-size: 0.9rem;
-        }
-
-        .status-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            animation: glow 2s ease-in-out infinite;
-        }
-
-        .status-dot.green { background: var(--accent-green); box-shadow: 0 0 10px var(--accent-green); }
-        .status-dot.yellow { background: var(--accent-yellow); box-shadow: 0 0 10px var(--accent-yellow); }
-        .status-dot.red { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
-
-        @keyframes glow {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-
-        /* Features Section */
-        .section {
-            padding: 5rem 2rem;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .section-title {
-            text-align: center;
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 3rem;
-        }
-
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 2rem;
-        }
-
-        .feature-card {
-            background: var(--bg-card);
-            padding: 2rem;
-            border-radius: 16px;
-            border: 1px solid var(--border);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .feature-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 4px;
-            height: 100%;
-            background: linear-gradient(180deg, var(--accent-green), var(--accent-blue));
-            transform: scaleY(0);
-            transition: transform 0.3s ease;
-        }
-
-        .feature-card:hover::before {
-            transform: scaleY(1);
-        }
-
-        .feature-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.12);
-            border-color: var(--accent-blue);
-        }
-
-        .feature-icon {
-            font-size: 2.5rem;
-            margin-bottom: 1rem;
-            display: inline-block;
-        }
-
-        .feature-title {
-            font-size: 1.3rem;
+            padding: 0.9rem 1.75rem;
+            border-radius: 10px;
             font-weight: 600;
-            margin-bottom: 0.75rem;
-            color: var(--text-primary);
+            font-size: 1rem;
+            text-decoration: none;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
-
-        .feature-desc {
-            color: var(--text-secondary);
-            font-size: 0.95rem;
+        .btn-primary {
+            background: var(--accent);
+            color: #000;
         }
-
-        /* Stats Section */
-        .stats {
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            padding: 4rem 2rem;
-            text-align: center;
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(34, 197, 94, 0.35);
         }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 2rem;
-            max-width: 1000px;
-            margin: 0 auto;
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text);
+            border: 1px solid var(--border);
         }
-
-        .stat-item {
-            padding: 2rem;
+        .btn-secondary:hover {
+            border-color: var(--accent);
+            color: var(--accent);
         }
-
-        .stat-number {
-            font-size: 3rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .stat-label {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-top: 0.5rem;
-        }
-
-        /* Tech Stack */
-        .tech-stack {
+        .status-row {
             display: flex;
             flex-wrap: wrap;
             gap: 1rem;
-            justify-content: center;
-            margin-top: 2rem;
+            margin-top: 2.5rem;
         }
-
-        .tech-badge {
-            padding: 0.5rem 1.25rem;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-        }
-
-        /* Screenshot Section */
-        .screenshot-container {
-            background: var(--bg-card);
-            padding: 3rem;
-            border-radius: 20px;
-            border: 1px solid var(--border);
-            text-align: center;
-            margin-top: 2rem;
-        }
-
-        .screenshot-placeholder {
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            height: 400px;
-            border-radius: 12px;
+        .status-pill {
             display: flex;
             align-items: center;
-            justify-content: center;
-            color: var(--text-secondary);
-            font-size: 1.2rem;
-            border: 2px dashed var(--border);
-        }
-
-        .dashboard-screenshot {
-            width: 100%;
-            height: auto;
-            border-radius: 12px;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
             border: 1px solid var(--border);
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-            transition: transform 0.3s ease;
+            border-radius: 8px;
+            font-size: 0.9rem;
         }
-
-        .dashboard-screenshot:hover {
-            transform: scale(1.02);
-            box-shadow: 0 15px 60px rgba(52, 211, 153, 0.3);
+        .status-pill .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
         }
+        .status-pill .dot.green { background: var(--accent); }
+        .status-pill .dot.yellow { background: var(--amber); }
+        .status-pill .dot.red { background: var(--red); }
 
-        /* Footer */
-        footer {
-            background: linear-gradient(180deg, var(--bg-light) 0%, var(--bg-card) 100%);
-            border-top: 1px solid var(--border);
-            padding: 4rem 2rem 2rem;
+        /* Sections */
+        section { padding: 5rem 0; }
+        .section-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(1.75rem, 3vw, 2.25rem);
+            font-weight: 700;
             text-align: center;
-        }
-
-        .footer-content {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        .footer-branding {
-            font-size: 2.5rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.5rem;
+            margin-bottom: 3rem;
             letter-spacing: -0.02em;
         }
 
-        .footer-tagline {
-            font-style: italic;
-            color: var(--text-secondary);
-            margin-bottom: 2rem;
-            font-size: 1.1rem;
+        /* Features grid */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        .feature {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.75rem;
+            transition: border-color 0.2s, transform 0.2s;
+        }
+        .feature:hover {
+            border-color: var(--accent);
+            transform: translateY(-4px);
+        }
+        .feature-icon { font-size: 1.75rem; margin-bottom: 0.75rem; }
+        .feature h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .feature p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
         }
 
-        .footer-links {
-            display: flex;
-            gap: 2rem;
-            justify-content: center;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .footer-link {
-            color: var(--text-secondary);
-            text-decoration: none;
-            transition: all 0.3s ease;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-        }
-
-        .footer-link:hover {
-            color: var(--accent-blue);
-            background: rgba(59, 130, 246, 0.1);
-        }
-
-        .footer-credits {
-            margin-top: 3rem;
-            padding-top: 2rem;
+        /* Stats strip */
+        .stats-strip {
+            background: var(--bg-elevated);
             border-top: 1px solid var(--border);
-            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 3rem 0;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 2rem;
+            text-align: center;
+        }
+        .stat-num {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+        .stat-label { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem; }
+
+        /* Why AMI */
+        .why-ami .feature { border-left: 3px solid var(--accent); }
+
+        /* Tech */
+        .tech-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+        .tech-tag {
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
             font-size: 0.9rem;
-            line-height: 2;
-            max-width: 800px;
+            color: var(--text-muted);
+        }
+        .screenshot-wrap {
+            margin-top: 2rem;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .screenshot-wrap img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .screenshot-wrap .caption {
+            padding: 1rem 1.5rem;
+            background: var(--bg-card);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        /* Download */
+        #download {
+            padding: 5rem 0;
+            text-align: center;
+        }
+        #download .section-title { margin-bottom: 1rem; }
+        #download p {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+            max-width: 520px;
             margin-left: auto;
             margin-right: auto;
         }
-
-        .footer-credits strong {
-            color: var(--text-primary);
+        .download-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 1rem;
         }
+        .download-buttons .btn { padding: 1rem 1.5rem; }
+        .os-icon { width: 20px; height: 20px; }
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            h1 { font-size: 2.5rem; }
-            .tagline { font-size: 1.2rem; }
-            .subtitle { font-size: 1rem; }
-            .section { padding: 3rem 1rem; }
-            .status-preview { flex-direction: column; align-items: center; }
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 4rem 0 2rem;
+            background: var(--bg-elevated);
         }
+        .footer-inner { text-align: center; max-width: 640px; margin: 0 auto; }
+        .footer-logo {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .footer-logo span { color: var(--accent); }
+        .footer-tagline { color: var(--text-muted); font-style: italic; margin-bottom: 1.5rem; }
+        .footer-links { display: flex; justify-content: center; gap: 1.5rem; margin-bottom: 2rem; flex-wrap: wrap; }
+        .footer-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .footer-links a:hover { color: var(--accent); }
+        .footer-legal {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            line-height: 1.8;
+        }
+        .footer-legal a { color: var(--blue); text-decoration: none; }
+        .footer-legal a:hover { text-decoration: underline; }
 
-        /* Scroll Animation */
+        /* Animations */
         .fade-in {
             opacity: 0;
-            transform: translateY(30px);
-            transition: all 0.6s ease;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
         }
+        .fade-in.visible { opacity: 1; transform: translateY(0); }
 
-        .fade-in.visible {
-            opacity: 1;
-            transform: translateY(0);
+        @media (max-width: 768px) {
+            nav { display: none; }
+            .hero-sub { font-size: 1rem; }
+            .status-row { justify-content: center; }
         }
     </style>
 </head>
 <body>
-    <!-- Hero Section -->
+    <header>
+        <div class="container">
+            <a href="#" class="logo">AM<span>I</span></a>
+            <nav>
+                <a href="#features">Funzionalità</a>
+                <a href="#download">Download</a>
+                <a href="https://github.com/dgiovannetti/AMI" class="btn-nav">GitHub</a>
+            </nav>
+        </div>
+    </header>
+
     <section class="hero">
-        <div class="hero-content">
-            <div class="logo-circle">AMI</div>
-            <h1>Active Monitor of Internet</h1>
-            <p class="tagline">"Sai se sei davvero online."</p>
-            <p class="subtitle">
-                Modern, accessible network monitoring with real-time graphs and colorblind-friendly design. 
-                Distinguish between local network and actual internet access. Apache 2.0 licensed.
-            </p>
-            <div class="cta-buttons">
-                <a href="#download" class="btn btn-primary">
-                    <span>⬇️</span> Download AMI
-                </a>
-                <a href="https://github.com/dgiovannetti/AMI" class="btn btn-secondary">
-                    <span>📂</span> View on GitHub
-                </a>
-            </div>
-            <div class="status-preview">
-                <div class="status-badge">
-                    <div class="status-dot green"></div>
-                    <span>✓ Online</span>
+        <div class="container">
+            <div class="hero-content">
+                <div class="badge"><strong>v3.0</strong> · Windows & macOS</div>
+                <h1><span class="gradient">Active Monitor of Internet</span></h1>
+                <p class="tagline">"Sai se sei davvero online."</p>
+                <p class="hero-sub">
+                    Monitor di connettività in tempo reale: distingue rete locale da internet, temi light/dark, 
+                    API opzionale, design accessibile. Leggero, configurabile, Apache 2.0.
+                </p>
+                <div class="cta-row">
+                    <a href="#download" class="btn btn-primary">⬇️ Scarica AMI 3.0</a>
+                    <a href="https://github.com/dgiovannetti/AMI" class="btn btn-secondary">📂 Codice su GitHub</a>
                 </div>
-                <div class="status-badge">
-                    <div class="status-dot yellow"></div>
-                    <span>! Unstable</span>
-                </div>
-                <div class="status-badge">
-                    <div class="status-dot red"></div>
-                    <span>✕ Offline</span>
+                <div class="status-row">
+                    <div class="status-pill"><span class="dot green"></span> ✓ Online</div>
+                    <div class="status-pill"><span class="dot yellow"></span> ! Instabile</div>
+                    <div class="status-pill"><span class="dot red"></span> ✕ Offline</div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Features Section -->
+    <section class="section" id="features">
+        <div class="container">
+            <h2 class="section-title">Funzionalità</h2>
+            <div class="features">
+                <div class="feature fade-in">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Monitor in tempo reale</h3>
+                    <p>Ping multi-host in parallelo, verifica HTTP, soglie configurabili. Rileva online, instabile e offline.</p>
+                </div>
+                <div class="feature fade-in">
+                    <div class="feature-icon">🌓</div>
+                    <h3>Temi light / dark / auto</h3>
+                    <p>Interfaccia coerente con tema di sistema o scelta manuale. Dashboard e impostazioni sempre leggibili.</p>
+                </div>
+                <div class="feature fade-in">
+                    <div class="feature-icon">🔐</div>
+                    <h3>API con token opzionale</h3>
+                    <p>Endpoint /status, /health, /stats. Autenticazione Bearer opzionale per integrazioni sicure.</p>
+                </div>
+                <div class="feature fade-in">
+                    <div class="feature-icon">📊</div>
+                    <h3>Dashboard e grafici</h3>
+                    <p>StatCard, grafici latenza e stato, modalità compatta. Layout reattivo e accessibile.</p>
+                </div>
+                <div class="feature fade-in">
+                    <div class="feature-icon">🔔</div>
+                    <h3>Notifiche native</h3>
+                    <p>Toast Windows e notifiche macOS su cambio stato. Modalità silenziosa e preferenze per evento.</p>
+                </div>
+                <div class="feature fade-in">
+                    <div class="feature-icon">📝</div>
+                    <h3>Log CSV e OTA</h3>
+                    <p>Log eventi con rotazione. Aggiornamenti automatici da GitHub Releases con verifica checksum.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="stats-strip">
+        <div class="container">
+            <div class="stats-grid">
+                <div class="fade-in">
+                    <div class="stat-num">&lt;1%</div>
+                    <div class="stat-label">CPU idle</div>
+                </div>
+                <div class="fade-in">
+                    <div class="stat-num">~50 MB</div>
+                    <div class="stat-label">RAM</div>
+                </div>
+                <div class="fade-in">
+                    <div class="stat-num">1 s</div>
+                    <div class="stat-label">Polling default</div>
+                </div>
+                <div class="fade-in">
+                    <div class="stat-num">v3.0.0</div>
+                    <div class="stat-label">Release</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section why-ami">
+        <div class="container">
+            <h2 class="section-title">Perché AMI</h2>
+            <div class="features">
+                <div class="feature fade-in">
+                    <div class="feature-icon">🔥</div>
+                    <h3>Rete vs Internet</h3>
+                    <p>Solo AMI distingue LAN da internet reale: ICMP + verifica HTTP. Gli altri tool usano solo ping.</p>
+                </div>
+                <div class="feature fade-in">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Leggero</h3>
+                    <p>~1% CPU, ~50 MB RAM. Niente server, niente database. Esegui e basta.</p>
+                </div>
+                <div class="feature fade-in">
+                    <div class="feature-icon">♿</div>
+                    <h3>Accessibile</h3>
+                    <p>WCAG 2.1, simboli oltre al colore (✓ ! ✕), contrasto e focus per tutti.</p>
+                </div>
+                <div class="feature fade-in">
+                    <div class="feature-icon">📜</div>
+                    <h3>Apache 2.0</h3>
+                    <p>Open source, uso commerciale con attribuzione. CiaoIM™ by Daniel Giovannetti.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <section class="section">
-        <h2 class="section-title">✨ Features</h2>
-        <div class="features-grid">
-            <div class="feature-card fade-in">
-                <div class="feature-icon">🎯</div>
-                <h3 class="feature-title">Real-time Monitoring</h3>
-                <p class="feature-desc">
-                    Multi-host ping testing with parallel execution. Tests connectivity against multiple hosts simultaneously for accurate status detection.
-                </p>
+        <div class="container">
+            <h2 class="section-title">Stack</h2>
+            <div class="tech-wrap">
+                <span class="tech-tag">Python 3.10+</span>
+                <span class="tech-tag">PyQt6</span>
+                <span class="tech-tag">Matplotlib</span>
+                <span class="tech-tag">Requests</span>
+                <span class="tech-tag">Ping3</span>
+                <span class="tech-tag">PyInstaller</span>
+                <span class="tech-tag">jsonschema</span>
             </div>
-            <div class="feature-card fade-in">
-                <div class="feature-icon">🌐</div>
-                <h3 class="feature-title">Smart Detection</h3>
-                <p class="feature-desc">
-                    Distinguishes between local network and internet connectivity. HTTP verification ensures actual web access beyond ICMP pings.
-                </p>
-            </div>
-            <div class="feature-card fade-in">
-                <div class="feature-icon">📊</div>
-                <h3 class="feature-title">Modern Dashboard</h3>
-                <p class="feature-desc">
-                    Clean Stripe/Vercel-inspired interface with real-time graphs, subtle shadows, and professional typography. Responsive and accessible.
-                </p>
-            </div>
-            <div class="feature-card fade-in">
-                <div class="feature-icon">🔔</div>
-                <h3 class="feature-title">Smart Notifications</h3>
-                <p class="feature-desc">
-                    Native Windows toast notifications on status changes. Configurable alerts with silent mode option for minimal interruptions.
-                </p>
-            </div>
-            <div class="feature-card fade-in">
-                <div class="feature-icon">📝</div>
-                <h3 class="feature-title">CSV Logging</h3>
-                <p class="feature-desc">
-                    Automatic event logging with timestamp, latency, and status. Exportable CSV format for analysis and troubleshooting.
-                </p>
-            </div>
-            <div class="feature-card fade-in">
-                <div class="feature-icon">⚙️</div>
-                <h3 class="feature-title">Fully Configurable</h3>
-                <p class="feature-desc">
-                    Customizable thresholds, polling intervals, test hosts, and notification preferences. Settings GUI with live apply.
-                </p>
+            <div class="screenshot-wrap fade-in">
+                <img src="resources/AMI-dashboard.png" alt="AMI Dashboard - Interfaccia moderna" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div style="display:none; min-height:280px; align-items:center; justify-content:center; background: var(--bg-card); color: var(--text-muted);">AMI Dashboard</div>
+                <p class="caption">Dashboard AMI 3.0 – temi, grafici in tempo reale, design accessibile</p>
             </div>
         </div>
     </section>
 
-    <!-- Stats Section -->
-    <section class="stats">
-        <div class="stats-grid">
-            <div class="stat-item">
-                <div class="stat-number">&lt;1%</div>
-                <div class="stat-label">CPU Usage (Idle)</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number">~50MB</div>
-                <div class="stat-label">Memory Footprint</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number">1s</div>
-                <div class="stat-label">Default Polling</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number">3</div>
-                <div class="stat-label">Parallel Hosts</div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Comparison Section -->
-    <section class="section">
-        <h2 class="section-title">🏆 Why AMI Stands Out</h2>
-        <div class="features-grid">
-            <div class="feature-card fade-in">
-                <div class="feature-icon">🔥</div>
-                <h3 class="feature-title">Real Internet Detection</h3>
-                <p class="feature-desc">
-                    <strong>Only AMI distinguishes LAN from Internet.</strong> Combines ICMP + HTTP verification. 
-                    Other tools (PingPlotter, PingInfoView, MultiPing) use ICMP only.
-                </p>
-            </div>
-            <div class="feature-card fade-in">
-                <div class="feature-icon">💎</div>
-                <h3 class="feature-title">Modern UX</h3>
-                <p class="feature-desc">
-                    <strong>Dark neon PyQt6 interface.</strong> Competitors have dated 2000s UIs or technical dashboards. 
-                    AMI is built for daily desktop use, not just troubleshooting.
-                </p>
-            </div>
-            <div class="feature-card fade-in">
-                <div class="feature-icon">⚡</div>
-                <h3 class="feature-title">Lightweight</h3>
-                <p class="feature-desc">
-                    <strong>~1% CPU, 50MB RAM idle.</strong> PingPlotter uses 200-300MB. 
-                    Enterprise tools like Zabbix require 500MB-1GB server infrastructure.
-                </p>
-            </div>
-            <div class="feature-card fade-in">
-                <div class="feature-icon">🎯</div>
-                <h3 class="feature-title">All-in-One</h3>
-                <p class="feature-desc">
-                    <strong>Dashboard + logging + notifications + live settings.</strong> 
-                    Competitors either lack features (PingInfoView has no graphs) or require complex setups.
-                </p>
-            </div>
-            <div class="feature-card fade-in">
-                <div class="feature-icon">✅</div>
-                <h3 class="feature-title">One-Click Portable</h3>
-                <p class="feature-desc">
-                    <strong>No installation, no server setup.</strong> Unlike Zabbix/Nagios (database + config) 
-                    or PingPlotter (heavy installer + paid license).
-                </p>
-            </div>
-            <div class="feature-card fade-in">
-                <div class="feature-icon">♿</div>
-                <h3 class="feature-title">Accessible Design</h3>
-                <p class="feature-desc">
-                    <strong>WCAG 2.1 compliant, colorblind-friendly.</strong> Status indicators use symbols (✓, !, ✕) alongside colors. 
-                    High contrast icons for all users.
-                </p>
-            </div>
-            <div class="feature-card fade-in">
-                <div class="feature-icon">📜</div>
-                <h3 class="feature-title">Apache 2.0 License</h3>
-                <p class="feature-desc">
-                    <strong>Open source with attribution.</strong> Free for commercial use with required credit to CiaoIM™ and Daniel Giovannetti. 
-                    Patent protection included.
-                </p>
-            </div>
-        </div>
-        <div style="text-align: center; margin-top: 3rem;">
-            <p style="color: var(--text-secondary); max-width: 700px; margin: 0 auto 1.5rem;">
-                <strong style="color: var(--accent-blue);">AMI v2.0 is the only lightweight desktop tool</strong> 
-                that combines real internet detection (HTTP + ICMP), accessible modern UX, native notifications, 
-                and live CSV logging in one portable package. WCAG 2.1 compliant.
-            </p>
-        </div>
-    </section>
-
-    <!-- Tech Stack Section -->
-    <section class="section">
-        <h2 class="section-title">🛠️ Built With</h2>
-        <div class="tech-stack">
-            <span class="tech-badge">Python 3.8+</span>
-            <span class="tech-badge">PyQt6</span>
-            <span class="tech-badge">Matplotlib</span>
-            <span class="tech-badge">Requests</span>
-            <span class="tech-badge">Ping3</span>
-            <span class="tech-badge">PyInstaller</span>
-        </div>
-        <div class="screenshot-container">
-            <img src="resources/AMI-dashboard.png" alt="AMI Dashboard - Modern Clean UI" class="dashboard-screenshot">
-            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 1rem; text-align: center;">
-                ✨ Modern Stripe-inspired UI with accessible design, real-time graphs, and clean typography
-            </p>
-        </div>
-    </section>
-
-    <!-- Stats Section -->
-    <section class="section" style="padding: 3rem 2rem; background: var(--bg-card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
-        <div style="max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 3rem; text-align: center;">
-            <div class="fade-in">
-                <div style="font-size: 3rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-green), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">v2.0.0</div>
-                <div style="color: var(--text-secondary); margin-top: 0.5rem;">Latest Release</div>
-            </div>
-            <div class="fade-in">
-                <div style="font-size: 3rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-green), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Apache 2.0</div>
-                <div style="color: var(--text-secondary); margin-top: 0.5rem;">Open Source</div>
-            </div>
-            <div class="fade-in">
-                <div style="font-size: 3rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-green), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">2 Platforms</div>
-                <div style="color: var(--text-secondary); margin-top: 0.5rem;">macOS & Windows</div>
-            </div>
-            <div class="fade-in">
-                <div style="font-size: 3rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-green), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">WCAG 2.1</div>
-                <div style="color: var(--text-secondary); margin-top: 0.5rem;">Accessible</div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Download Section -->
     <section class="section" id="download">
-        <h2 class="section-title">📦 Get Started</h2>
-        <div style="text-align: center; max-width: 600px; margin: 0 auto;">
-            <p style="color: var(--text-secondary); margin-bottom: 2rem;">
-                Download the latest release or clone from GitHub to get started in seconds.
-            </p>
-            <div class="cta-buttons">
-                <a href="https://github.com/dgiovannetti/AMI/releases/download/v2.0.0/AMI-macOS-App.zip" class="btn btn-primary">
-                    <svg class="os-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M18.71,19.5C17.88,20.74 17,21.95 15.66,21.97C14.32,22 13.89,21.18 12.37,21.18C10.84,21.18 10.37,21.95 9.1,22C7.79,22.05 6.8,20.68 5.96,19.47C4.25,17 2.94,12.45 4.7,9.39C5.57,7.87 7.13,6.91 8.82,6.88C10.1,6.86 11.32,7.75 12.11,7.75C12.89,7.75 14.37,6.68 15.92,6.84C16.57,6.87 18.39,7.1 19.56,8.82C19.47,8.88 17.39,10.1 17.41,12.63C17.44,15.65 20.06,16.66 20.09,16.67C20.06,16.74 19.67,18.11 18.71,19.5M13,3.5C13.73,2.67 14.94,2.04 15.94,2C16.07,3.17 15.6,4.35 14.9,5.19C14.21,6.04 13.07,6.7 11.95,6.61C11.8,5.46 12.36,4.26 13,3.5Z"/>
-                    </svg>
-                    Download for macOS
+        <div class="container">
+            <h2 class="section-title">Download</h2>
+            <p>Scarica l’ultima release da GitHub. Per eseguire da sorgente: <code style="background:var(--bg-card);padding:0.2rem 0.5rem;border-radius:4px;font-size:0.9rem;">cd 3.0 && pip install -r requirements.txt && python run.py</code></p>
+            <div class="download-buttons">
+                <a href="https://github.com/dgiovannetti/AMI/releases/latest" class="btn btn-primary">
+                    <svg class="os-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                    Ultima release (macOS / Windows)
                 </a>
-                <a href="https://github.com/dgiovannetti/AMI/releases/download/v2.0.0/AMI-Windows.zip" class="btn btn-primary">
-                    <svg class="os-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M3,12V6.75L9,5.43V11.91L3,12M20,3V11.75L10,11.9V5.21L20,3M3,13L9,13.09V19.9L3,18.75V13M20,13.25V22L10,20.09V13.1L20,13.25Z"/>
-                    </svg>
-                    Download for Windows
-                </a>
-                <a href="https://github.com/dgiovannetti/AMI/releases/tag/v2.0.0" class="btn btn-secondary">
-                    <span>📦</span> All Releases
-                </a>
+                <a href="https://github.com/dgiovannetti/AMI/releases/tag/v3.0.0" class="btn btn-secondary">v3.0.0</a>
+                <a href="https://github.com/dgiovannetti/AMI" class="btn btn-secondary">Repository</a>
             </div>
         </div>
     </section>
 
-    <!-- Footer -->
     <footer>
-        <div class="footer-content">
-            <div class="footer-branding">AMI</div>
-            <div class="footer-tagline">"Sai se sei davvero online."</div>
-            <div class="footer-links">
-                <a href="https://github.com/dgiovannetti/AMI" class="footer-link">GitHub</a>
-                <a href="https://github.com/dgiovannetti/AMI/issues" class="footer-link">Issues</a>
-            </div>
-            <div class="footer-credits">
-                <strong>© 2025 CiaoIM™ by Daniel Giovannetti</strong><br>
-                <a href="https://ciaoim.tech" style="color: var(--accent-blue); text-decoration: none;">ciaoim.tech</a><br>
-                <em style="font-size: 0.8rem; opacity: 0.7;">Crafted logic. Measured force. Front-end vision, compiled systems, and hardcoded ethics.</em><br>
-                <br>
-                <strong style="font-size: 0.85rem;">License:</strong> Apache 2.0 - Free for commercial use with attribution<br>
-                <a href="https://github.com/dgiovannetti/AMI/blob/main/LICENSE" style="color: var(--accent-blue); text-decoration: none; font-size: 0.8rem;">View License</a> | 
-                <a href="https://github.com/dgiovannetti/AMI/blob/main/NOTICE" style="color: var(--accent-blue); text-decoration: none; font-size: 0.8rem;">Attribution Requirements</a><br>
-                <br>
-                <em style="font-size: 0.75rem; opacity: 0.6; margin-top: 0.5rem; display: inline-block;">
-                    Intuizione colta insieme a Giovanni Calvario in aliscafo per il 40° Convegno di Capri dei Giovani Imprenditori
-                </em>
+        <div class="container">
+            <div class="footer-inner">
+                <div class="footer-logo">AM<span>I</span></div>
+                <p class="footer-tagline">"Sai se sei davvero online."</p>
+                <div class="footer-links">
+                    <a href="https://github.com/dgiovannetti/AMI">GitHub</a>
+                    <a href="https://github.com/dgiovannetti/AMI/releases">Release</a>
+                    <a href="https://github.com/dgiovannetti/AMI/issues">Issues</a>
+                    <a href="https://ciaoim.tech">ciaoim.tech</a>
+                </div>
+                <div class="footer-legal">
+                    <strong>© 2025 CiaoIM™ by Daniel Giovannetti</strong><br>
+                    <a href="https://github.com/dgiovannetti/AMI/blob/main/LICENSE">Licenza Apache 2.0</a> · Uso commerciale con attribuzione<br>
+                    <em style="font-size:0.8rem;opacity:0.8;">Crafted logic. Measured force. Front-end vision, compiled systems, and hardcoded ethics.</em><br>
+                    <em style="font-size:0.75rem;opacity:0.6;">Intuizione colta insieme a Giovanni Calvario in aliscafo per il 40° Convegno di Capri dei Giovani Imprenditori</em>
+                </div>
             </div>
         </div>
     </footer>
 
     <script>
-        // Scroll animation
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        };
-
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('visible');
-                }
+                if (entry.isIntersecting) entry.target.classList.add('visible');
             });
-        }, observerOptions);
-
+        }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
         document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
 
-        // Smooth scroll
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
+        document.querySelectorAll('a[href^="#"]').forEach(a => {
+            a.addEventListener('click', function(e) {
+                const id = this.getAttribute('href');
+                if (id === '#') return;
                 e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
+                document.querySelector(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             });
         });
     </script>

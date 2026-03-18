@@ -2,7 +2,7 @@
   "app": {
     "name": "AMI",
     "subtitle": "Active Monitor of Internet",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "copyright": "© 2025 CiaoIM™ by Daniel Giovannetti",
     "website": "ciaoim.tech",
     "tagline": "Crafted logic. Measured force. Front-end vision, compiled systems, and hardcoded ethics.",
@@ -54,5 +54,14 @@
     "github_repo": "dgiovannetti/AMI",
     "max_postponements": 3,
     "notify_on_update": true
+  },
+  "speed_test": {
+    "enabled": true,
+    "interval_minutes": 30,
+    "test_url": "https://speed.cloudflare.com/__down?bytes=52428800",
+    "download_size_mb": 10,
+    "timeout_seconds": 30,
+    "tier_low_mbps": 100,
+    "tier_high_mbps": 1000
   }
 }

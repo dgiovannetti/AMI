@@ -17,7 +17,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "app": {
         "name": "AMI",
         "subtitle": "Active Monitor of Internet",
-        "version": "3.0.0",
+        "version": "3.1.0",
         "copyright": "© 2025 CiaoIM™ by Daniel Giovannetti",
         "website": "ciaoim.tech",
         "tagline": "Crafted logic. Measured force. Front-end vision, compiled systems, and hardcoded ethics.",
@@ -56,6 +56,15 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "github_repo": "dgiovannetti/AMI",
         "max_postponements": 3,
         "notify_on_update": True,
+    },
+    "speed_test": {
+        "enabled": True,
+        "interval_minutes": 30,
+        "test_url": "https://speed.cloudflare.com/__down?bytes=52428800",
+        "download_size_mb": 10,
+        "timeout_seconds": 30,
+        "tier_low_mbps": 100,
+        "tier_high_mbps": 1000,
     },
 }
 
@@ -119,7 +128,7 @@ def _migrate_from_2x(config: Dict[str, Any]) -> Dict[str, Any]:
     except (ValueError, IndexError):
         major = 0
     if major < 3:
-        app["version"] = "3.0.0"
+        app["version"] = "3.1.0"
     mon = out.setdefault("monitoring", {})
     mon.setdefault("http_test_urls", [])
     api = out.setdefault("api", {})
@@ -127,6 +136,20 @@ def _migrate_from_2x(config: Dict[str, Any]) -> Dict[str, Any]:
     ui = out.setdefault("ui", {})
     if ui.get("theme") not in ("auto", "light", "dark"):
         ui["theme"] = "auto"
+    st = out.setdefault("speed_test", {
+        "enabled": True,
+        "interval_minutes": 30,
+        "test_url": "https://speed.cloudflare.com/__down?bytes=52428800",
+        "download_size_mb": 10,
+        "timeout_seconds": 30,
+        "tier_low_mbps": 100,
+        "tier_high_mbps": 1000,
+    })
+    # Migrate from slow default (proof.ovh) to Cloudflare for accurate high-speed measurement
+    if "proof.ovh" in str(st.get("test_url", "")):
+        st["test_url"] = "https://speed.cloudflare.com/__down?bytes=52428800"
+        st["download_size_mb"] = 10
+        st["timeout_seconds"] = 30
     return out
 
 

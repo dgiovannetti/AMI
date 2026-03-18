@@ -50,6 +50,13 @@ class NetworkMonitor:
         self._last_isp_check_ts: float = 0.0
         self._last_vpn_status: Optional[Tuple[bool, str]] = None
         self._last_vpn_check_ts: float = 0.0
+        self._last_speed_mbps: Optional[float] = None
+        self._last_speed_tier: Optional[str] = None
+
+    def set_speed_result(self, speed_mbps: Optional[float], tier: Optional[str]) -> None:
+        """Update last speed test result (called from speed test thread)."""
+        self._last_speed_mbps = speed_mbps
+        self._last_speed_tier = tier
 
     def ping_host(self, host: str, timeout: int = 5) -> PingResult:
         """Ping a single host (ICMP or TCP fallback)."""
@@ -215,6 +222,9 @@ class NetworkMonitor:
                 status.vpn_provider = vpn_hint
             except Exception:
                 pass
+
+        status.speed_mbps = self._last_speed_mbps
+        status.speed_tier = self._last_speed_tier
 
         if status.status in ("online", "unstable"):
             self.successful_checks += 1

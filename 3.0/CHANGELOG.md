@@ -1,5 +1,9 @@
 # Changelog - AMI 3.0
 
+## 3.1.0
+
+- **Speed test**: Download throughput measurement (Mbps/Gbps) with configurable interval, timeout, test URL, and download size. Three tiers (Slow / Medium / Fast) shown in tray tooltip, menu, and dashboard StatCard. All parameters configurable in Settings → Speed test tab. API `/status` includes optional `speed_mbps` and `speed_tier`.
+
 ## 3.0.0
 
 - **Architecture**: New package layout under `src/ami/` with clear separation of core, services, and UI. Config validation via JSON schema and migration from 2.x config.

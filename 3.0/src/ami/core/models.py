@@ -34,3 +34,5 @@ class ConnectionStatus:
     isp: Optional[str] = None
     vpn_connected: Optional[bool] = None
     vpn_provider: Optional[str] = None
+    speed_mbps: Optional[float] = None
+    speed_tier: Optional[str] = None  # 'slow' | 'medium' | 'fast'
