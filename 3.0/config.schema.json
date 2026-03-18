@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["app", "monitoring", "thresholds", "notifications", "logging", "api", "startup", "ui", "updates"],
+  "properties": {
+    "app": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "version": { "type": "string" },
+        "copyright": { "type": "string" },
+        "website": { "type": "string" },
+        "tagline": { "type": "string" },
+        "inspiration": { "type": "string" }
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "required": ["ping_hosts"],
+      "properties": {
+        "ping_hosts": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "http_test_url": { "type": "string" },
+        "http_test_urls": { "type": "array", "items": { "type": "string" } },
+        "polling_interval": { "type": "number", "minimum": 0.5 },
+        "timeout": { "type": "integer", "minimum": 1 },
+        "retry_count": { "type": "integer", "minimum": 0 },
+        "enable_http_test": { "type": "boolean" },
+        "internal_test_mode": { "type": "boolean" }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "properties": {
+        "unstable_latency_ms": { "type": "number" },
+        "unstable_loss_percent": { "type": "number" }
+      }
+    },
+    "notifications": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "silent_mode": { "type": "boolean" },
+        "notify_on_disconnect": { "type": "boolean" },
+        "notify_on_reconnect": { "type": "boolean" },
+        "notify_on_unstable": { "type": "boolean" }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "log_file": { "type": "string" },
+        "max_log_size_mb": { "type": "number" }
+      }
+    },
+    "api": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "port": { "type": "integer" },
+        "auth_token": { "type": "string" }
+      }
+    },
+    "startup": {
+      "type": "object",
+      "properties": {
+        "auto_start": { "type": "boolean" }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "properties": {
+        "theme": { "type": "string", "enum": ["auto", "light", "dark"] },
+        "show_dashboard_on_start": { "type": "boolean" },
+        "compact_status_window": { "type": "boolean" }
+      }
+    },
+    "updates": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "check_on_startup": { "type": "boolean" },
+        "check_interval_hours": { "type": "integer" },
+        "github_repo": { "type": "string" },
+        "max_postponements": { "type": "integer" },
+        "notify_on_update": { "type": "boolean" }
+      }
+    }
+  }
+}
