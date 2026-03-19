@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **macOS crash SIGABRT all’avvio (.app)**: `applicationStateChanged` collegato troppo presto + `processEvents()` in `__init__` causavano **riapertura finestre nello stack** di `QGuiApplicationPrivate::setApplicationState` → `QMessageLogger::fatal` / abort. Fix: connessione del segnale **solo a fine** `__init__` e gestione **differita** con `QTimer.singleShot(0, …)`.
 - **macOS tray in .app PyInstaller**: nel bundle frozen `QIcon.setIsMask(True)` su pixmap poteva rendere l’icona **invisibile** in menu bar (da `python -m ami.main` funzionava). Fix: in frozen si usano **PNG a colori** da `resources/` o cerchio colorato di fallback **senza** maschera; `QTimer` riapplica icona/show dopo l’init Cocoa.
 - **macOS tray / Dock / avvio**: `LSUIElement` **false** (icona **Dock** per recuperare l’app se il tray è nascosto). Icona menu bar come **maschera template** (`QIcon.setIsMask`) — ● online, anello unstable, ✕ offline. **Click sinistro** sull’icona tray apre il menu. **Splash** non insieme alla finestra compatta; default config **`compact_status_window`: false**. **Compact**: pulsante chiudi = **nascondi** (riapri da menu «Show status window» o cliccando il Dock). Con app attiva da Dock e nessuna finestra visibile → si riapre compatta (se abilitata) o la dashboard.
 - **OTA / release notes**: Il workflow `release-3.0.yml` appende al body della GitHub Release il blocco **Checksum OTA** (markdown allineato a `UpdateManager._checksum_for_asset`). L'updater associa l'hash al nome dello ZIP della piattaforma.

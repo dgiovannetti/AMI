@@ -75,7 +75,9 @@ class SystemTrayApp:
             pass
         self.app = QApplication(sys.argv)
         self.app.setQuitOnLastWindowClosed(False)
-        self.app.applicationStateChanged.connect(self._on_application_state_changed)
+        # Non collegare applicationStateChanged qui: durante __init__ processEvents() può
+        # emettere ApplicationActive; aprire finestre da quello stack su macOS → qFatal/SIGABRT (Qt 6 + Cocoa).
+        self._startup_complete = False
         self.config = self.load_config()
         app_version = self.config.get("app", {}).get("version", __version__)
         use_compact = _effective_compact_status_window(self.config)
@@ -182,6 +184,10 @@ class SystemTrayApp:
         if self.config.get("ui", {}).get("show_dashboard_on_start", False) or os.environ.get("AMI_FORCE_DASHBOARD") == "1":
             QTimer.singleShot(2500, self.show_dashboard)
 
+        self._startup_complete = True
+        if sys.platform == "darwin":
+            self.app.applicationStateChanged.connect(self._on_application_state_changed)
+
     def _allow_splash_close(self) -> None:
         self._splash_closable = True
         if self.current_status and not self._splash_closed:
@@ -207,10 +213,17 @@ class SystemTrayApp:
         return False
 
     def _on_application_state_changed(self, state: Qt.ApplicationState) -> None:
-        """Dock: se non resta nulla in primo piano, riapri compatta o dashboard."""
+        """Dock: differito — mai show()/dashboard dallo stack di setApplicationState (crash Qt macOS)."""
         if sys.platform != "darwin":
             return
         if state != Qt.ApplicationState.ApplicationActive:
+            return
+        QTimer.singleShot(0, self._deferred_application_active_from_dock)
+
+    def _deferred_application_active_from_dock(self) -> None:
+        if not getattr(self, "_startup_complete", False):
+            return
+        if self.app.applicationState() != Qt.ApplicationState.ApplicationActive:
             return
         if self._main_ui_is_visible():
             return
