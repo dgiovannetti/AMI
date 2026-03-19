@@ -31,9 +31,11 @@ jobs:
       run:
         working-directory: "3.0"
     steps:
+      # Su workflow_dispatch: build dalla branch main (hotfix artefatti sulla stessa release/tag).
+      # Su push tag: checkout del commit taggato.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
 
       - name: Tag name for ZIP filenames
         shell: bash
