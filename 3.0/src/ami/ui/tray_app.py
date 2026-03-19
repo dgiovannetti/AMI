@@ -86,6 +86,8 @@ class SystemTrayApp:
         self.config = self.load_config()
         app_version = self.config.get("app", {}).get("version", __version__)
         use_compact = _effective_compact_status_window(self.config)
+        # Cache icone tray macOS (template da PNG per path)
+        self._macos_tray_icon_cache: dict[str, QIcon] = {}
 
         self.updater = None
         self.update_timer = None
@@ -384,29 +386,97 @@ class SystemTrayApp:
 
     def _macos_tray_icon_from_status_png(self, path: Path, color_key: str) -> QIcon:
         """
-        Menu bar macOS: **solo** le risorse progettate `status_green|yellow|red.png` in resources/.
-        Nessuna maschera template né cerchi disegnati in codice.
+        Menu bar macOS: usa le PNG ufficiali `status_*.png`.
+
+        Su molte versioni di macOS le icone **a colori** nel tray non vengono disegnate
+        (restano «vuote»). Qt richiede una **maschera template** (`setIsMask`): la costruiamo
+        dalla **stessa PNG** (alpha + silhouette nera), così la forma è quella progettata.
+        Con `AMI_TRAY_COLOR=1` si forza solo il rendering a colori (per test).
         """
-        if path.is_file():
-            fp = os.fspath(path.resolve())
-            img = QImage(fp)
-            if not img.isNull():
-                img = img.convertToFormat(QImage.Format.Format_ARGB32)
-                icon = QIcon()
-                for side in (18, 22, 32, 44, 64):
-                    scaled = img.scaled(
-                        side,
-                        side,
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation,
-                    )
-                    pm = QPixmap.fromImage(scaled)
-                    if not pm.isNull():
-                        icon.addPixmap(pm)
-                if not icon.isNull():
-                    _tray_debug(f"macOS tray: {path.name} from {fp}")
-                    return icon
-        _tray_debug(f"macOS tray: missing/unreadable {path} → fallback raster")
+        if not path.is_file():
+            _tray_debug(f"macOS tray: missing {path}")
+            return self._create_icon(color_key)
+        fp = os.fspath(path.resolve())
+
+        if os.environ.get("AMI_TRAY_COLOR", "").strip() in ("1", "true", "yes"):
+            return self._macos_tray_colored_pixmaps_from_png(fp, path.name, color_key)
+
+        if fp in self._macos_tray_icon_cache:
+            return self._macos_tray_icon_cache[fp]
+
+        icon = self._build_macos_template_icon_from_png(fp)
+        if icon is not None and not icon.isNull():
+            _tray_debug(f"macOS tray: template mask from {path.name}")
+            self._macos_tray_icon_cache[fp] = icon
+            return icon
+
+        icon2 = self._macos_tray_colored_pixmaps_from_png(fp, path.name, color_key)
+        self._macos_tray_icon_cache[fp] = icon2
+        return icon2
+
+    def _build_macos_template_icon_from_png(self, fp: str) -> QIcon | None:
+        """Silhouette nera con alpha dalla PNG ufficiale → visibile come template in menu bar."""
+        img = QImage(fp)
+        if img.isNull():
+            return None
+        max_side = 128
+        if max(img.width(), img.height()) > max_side:
+            img = img.scaled(
+                max_side,
+                max_side,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        img = img.convertToFormat(QImage.Format.Format_ARGB32)
+        w, h = img.width(), img.height()
+        out = QImage(w, h, QImage.Format.Format_ARGB32)
+        out.fill(0)
+        for y in range(h):
+            for x in range(w):
+                c = img.pixelColor(x, y)
+                a = c.alpha()
+                if a <= 0:
+                    continue
+                out.setPixelColor(x, y, QColor(0, 0, 0, a))
+        icon = QIcon()
+        for s in (16, 18, 22, 32, 44):
+            sc = out.scaled(
+                s,
+                s,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            pm = QPixmap.fromImage(sc)
+            if not pm.isNull():
+                icon.addPixmap(pm, QIcon.Mode.Normal, QIcon.State.Off)
+        if icon.isNull():
+            return None
+        try:
+            icon.setIsMask(True)
+        except (AttributeError, TypeError):
+            pass
+        return icon
+
+    def _macos_tray_colored_pixmaps_from_png(self, fp: str, name: str, color_key: str) -> QIcon:
+        """Fallback: PNG a colori ridimensionate (se il template non basta)."""
+        img = QImage(fp)
+        if img.isNull():
+            return self._create_icon(color_key)
+        img = img.convertToFormat(QImage.Format.Format_ARGB32)
+        icon = QIcon()
+        for side in (18, 22, 32, 44, 64):
+            scaled = img.scaled(
+                side,
+                side,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            pm = QPixmap.fromImage(scaled)
+            if not pm.isNull():
+                icon.addPixmap(pm, QIcon.Mode.Normal, QIcon.State.Off)
+        if not icon.isNull():
+            _tray_debug(f"macOS tray: colored {name}")
+            return icon
         return self._create_icon(color_key)
 
     def _first_show_macos_tray(self) -> None:
