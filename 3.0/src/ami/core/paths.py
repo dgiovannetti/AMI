@@ -16,8 +16,8 @@ def get_base_path() -> Path:
     """
     if getattr(sys, "frozen", False):
         return Path(sys._MEIPASS)
-    # __file__ = 3.0/src/ami/core/paths.py -> parents[2] = 3.0
-    return Path(__file__).resolve().parents[2]
+    # __file__ = …/src/ami/core/paths.py → cartella progetto 3.0/ è parents[3] (non parents[2]=src/)
+    return Path(__file__).resolve().parents[3]
 
 
 def get_config_path() -> Path:
