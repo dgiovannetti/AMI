@@ -168,7 +168,7 @@ Modifica `.github/workflows/build.yml`:
 
 ### L’app si chiude subito (crash report: `CFBundleCopyBundleURL` / `QtCore` / `EXC_BAD_ACCESS`)
 
-Succedeva con Qt 6 nel bundle PyInstaller se i **plugin Qt** non erano risolti prima del caricamento di PyQt6. Nelle build **≥ 3.1.4** da GitHub è incluso il bootstrap (`QT_PLUGIN_PATH` / `QT_QPA_PLATFORM_PLUGIN_PATH`). Se usi una build vecchia, **scarica di nuovo** lo ZIP macOS dalla release aggiornata.
+Qt 6 nel bundle PyInstaller su macOS molto recenti poteva crashare nell’init statico di `QtCore.abi3.so`. Le build aggiornate includono **`Contents/Resources/qt.conf`**, variabili **`QT_CONF` / `QT_PLUGIN_PATH`** (path assoluti) prima di PyQt6 e **PyQt6 ≥ 6.8**. Se vedi ancora il crash, **scarica di nuovo** `AMI-v3.1.4-macos.zip` dopo l’ultimo workflow Release.
 
 ### "L'app è danneggiata e non può essere aperta"
 

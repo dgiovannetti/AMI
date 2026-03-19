@@ -1,6 +1,7 @@
-PyQt6>=6.6.0
-PyQt6-Qt6>=6.6.0
-PyQt6-sip>=13.6.0
+# Qt 6.8+ migliora layout/macOS; utile su macOS 15/26 con bundle PyInstaller
+PyQt6>=6.8.0
+PyQt6-Qt6>=6.8.0
+PyQt6-sip>=13.8.0
 requests>=2.31.0
 aiohttp>=3.9.1
 ping3>=4.0.4

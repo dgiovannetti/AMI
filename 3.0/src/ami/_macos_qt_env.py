@@ -1,8 +1,11 @@
 """
-macOS + PyInstaller: Qt 6's QLibraryInfo uses CFBundle APIs during QtCore.abi3.so init.
-If plugin paths are unset, Qt can pass an invalid bundle ref → EXC_BAD_ACCESS in CFBundleCopyBundleURL.
+macOS frozen .app: Qt 6's QLibraryInfo hits CFBundleCopyBundleURL during QtCore.abi3.so
+static init (qdarwinpermissionplugin). PyInstaller's layout + macOS 26+ → SIGSEGV unless:
 
-Call apply_if_needed() before any PyQt6 import when frozen (see ami.main).
+1) Contents/Resources/qt.conf exists (written at build time; Prefix → PyQt6/Qt6).
+2) QT_PLUGIN_PATH / QT_QPA_PLATFORM_PLUGIN_PATH are set to absolute paths BEFORE import PyQt6.
+
+Use os.environ[...] = (not setdefault): a preset empty/wrong value would block the fix.
 """
 
 from __future__ import annotations
@@ -12,51 +15,21 @@ import sys
 from pathlib import Path
 
 
-def _search_plugins_under(root: Path) -> Path | None:
-    """Find .../plugins that contains platforms/ (libqcocoa.dylib)."""
-    if not root.is_dir():
-        return None
-    direct = root / "PyQt6" / "Qt6" / "plugins"
-    if (direct / "platforms").is_dir():
-        return direct
-    alt = root / "PyQt6" / "Qt" / "plugins"
-    if (alt / "platforms").is_dir():
-        return alt
-    try:
-        for p in root.rglob("plugins"):
-            if p.is_dir() and (p / "platforms").is_dir() and "PyQt6" in p.parts:
-                return p
-    except OSError:
-        pass
-    return None
-
-
 def apply_if_needed() -> None:
     if not getattr(sys, "frozen", False) or sys.platform != "darwin":
         return
-    base = getattr(sys, "_MEIPASS", None)
-    if not base:
+    exe = Path(sys.executable).resolve()
+    if exe.parent.name != "MacOS":
         return
-
-    roots: list[Path] = [Path(base)]
-    # BUNDLE: executable in MacOS/, payload often in Frameworks/
-    macos_dir = Path(sys.executable).resolve().parent
-    if macos_dir.name == "MacOS":
-        fw = macos_dir.parent / "Frameworks"
-        if fw.is_dir() and fw not in roots:
-            roots.insert(0, fw)
-
-    plugins_root: Path | None = None
-    for r in roots:
-        plugins_root = _search_plugins_under(r)
-        if plugins_root is not None:
-            break
-    if plugins_root is None:
+    frameworks = exe.parent.parent / "Frameworks"
+    plugins = frameworks / "PyQt6" / "Qt6" / "plugins"
+    platforms = plugins / "platforms"
+    if not platforms.is_dir():
         return
-
-    platforms = plugins_root / "platforms"
-    pr = os.fspath(plugins_root)
-    os.environ.setdefault("QT_PLUGIN_PATH", pr)
-    if platforms.is_dir():
-        os.environ.setdefault("QT_QPA_PLATFORM_PLUGIN_PATH", os.fspath(platforms))
-    os.environ.setdefault("QT_QPA_PLATFORM", "cocoa")
+    # Force: never rely on setdefault — broken presets are common from the shell / launcher.
+    os.environ["QT_PLUGIN_PATH"] = os.fspath(plugins)
+    os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = os.fspath(platforms)
+    os.environ["QT_QPA_PLATFORM"] = "cocoa"
+    qconf = exe.parent.parent / "Resources" / "qt.conf"
+    if qconf.is_file():
+        os.environ["QT_CONF"] = os.fspath(qconf)

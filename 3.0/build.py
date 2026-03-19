@@ -97,6 +97,31 @@ def _codesign_macos_app(app_path: Path) -> None:
     subprocess.run(cmd, check=True, cwd=str(app_path.parent))
 
 
+def _write_macos_qt_conf(app_path: Path) -> None:
+    """
+    Qt 6 on macOS resolves install paths via CFBundle; PyInstaller's layout breaks that on
+    newer macOS (crash in CFBundleCopyBundleURL). qt.conf next to the executable forces
+    filesystem paths — see https://doc.qt.io/qt-6/qt-conf.html
+    """
+    contents = app_path / "Contents"
+    resources = contents / "Resources"
+    qt6 = contents / "Frameworks" / "PyQt6" / "Qt6"
+    if not qt6.is_dir():
+        print(f"[WARN] Skip qt.conf: missing {qt6}")
+        return
+    resources.mkdir(parents=True, exist_ok=True)
+    # In Resources: evita che codesign tratti MacOS/qt.conf come “subcomponent” non firmato.
+    conf = resources / "qt.conf"
+    conf.write_text(
+        "[Paths]\n"
+        "Prefix = ../Frameworks/PyQt6/Qt6\n"
+        "Plugins = plugins\n"
+        "Libraries = lib\n",
+        encoding="utf-8",
+    )
+    print(f"[OK] Wrote {conf}")
+
+
 def build_executable() -> bool:
     print("\nBuilding executable...")
     root_dir = Path(__file__).parent
@@ -124,6 +149,7 @@ def build_executable() -> bool:
         if not app_path.is_dir():
             print(f"\n[FAIL] Expected {app_path}")
             return False
+        _write_macos_qt_conf(app_path)
         try:
             _codesign_macos_app(app_path)
             print("[OK] macOS codesign completed")
