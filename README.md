@@ -114,18 +114,15 @@ AMI features a **completely redesigned UI** inspired by Stripe, Vercel, and mode
 3. Run `AMI.exe`
 4. The application will appear in your system tray
 
-#### macOS
-1. Download the latest `AMI-Package.zip` from releases
-2. Extract the ZIP file to your preferred location
-3. **Important:** macOS will block unsigned executables by default
-   - **Right-click** (or Ctrl+click) on the `AMI` executable
-   - Select **"Open"** from the menu
-   - Click **"Open"** in the confirmation dialog
-   - Alternatively, use Terminal: `cd AMI-Package && xattr -cr AMI && chmod +x AMI && ./AMI`
-   - 📖 See [MACOS_SECURITY.md](MACOS_SECURITY.md) for detailed Gatekeeper bypass instructions
-4. The application will appear in your menu bar
+#### macOS (AMI 3.x)
+1. Download the latest `AMI-*-macos.zip` from [Releases](https://github.com/dgiovannetti/AMI/releases) (cartella **`AMI-Package`** con **`AMI.app`**).
+2. Estrai lo ZIP dove preferisci.
+3. **Avvio:** doppio click su **`AMI.app`** (o tasto destro → **Apri** la prima volta).
+4. **Gatekeeper:** senza certificato Apple Developer può comparire un avviso (a volte citava *Python* nelle build vecchie). Usa **Apri** dal menu contestuale oppure **Impostazioni → Privacy e sicurezza → Apri comunque**. Dopo la prima apertura macOS ricorda l’eccezione.
+5. In alternativa da Terminale: `xattr -cr AMI.app && open AMI.app` (dalla cartella `AMI-Package`).
+6. 📖 Dettagli in **[MACOS_SECURITY.md](MACOS_SECURITY.md)**.
 
-**Note:** AMI is a UNIX executable (not a `.app` bundle), so it appears as a generic file in Finder.
+**Nota:** Le build **3.1.4+** su macOS sono un bundle **`.app`** con nome **AMI** in Finder (non più un singolo binario `AMI` sciolto).
 
 ### Option 2: From Source (For Developers)
 

@@ -6,6 +6,7 @@ SHA256 checksum verification; forced update after max postponements.
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -215,17 +216,21 @@ class UpdateManager:
             extract_dir.mkdir(parents=True, exist_ok=True)
             with zipfile.ZipFile(package_path, "r") as z:
                 z.extractall(extract_dir)
-            if sys.platform == "win32":
-                new_exe = self._find_file(extract_dir, "AMI.exe")
-            else:
-                new_exe = self._find_file(extract_dir, "AMI")
-            if not new_exe:
-                return False
             if not getattr(sys, "frozen", False):
                 return False
             current_exe = Path(sys.executable)
             if sys.platform == "win32":
+                new_exe = self._find_file(extract_dir, "AMI.exe")
+                if not new_exe:
+                    return False
                 return self._install_windows(current_exe, new_exe)
+            if sys.platform == "darwin":
+                new_bundle = self._find_macos_app_bundle(extract_dir)
+                if new_bundle:
+                    return self._install_macos_app_bundle(current_exe, new_bundle)
+            new_exe = self._find_file(extract_dir, "AMI")
+            if not new_exe:
+                return False
             return self._install_unix(current_exe, new_exe)
         except Exception as e:
             print(f"[UPDATE] Installation failed: {e}")
@@ -236,6 +241,55 @@ class UpdateManager:
             if filename in files:
                 return Path(root) / filename
         return None
+
+    @staticmethod
+    def _macos_bundle_root(exe: Path) -> Optional[Path]:
+        """If exe lives inside Foo.app/Contents/MacOS/..., return Foo.app."""
+        cur = exe.resolve().parent
+        while True:
+            if cur.name.endswith(".app"):
+                return cur
+            parent = cur.parent
+            if parent == cur:
+                return None
+            cur = parent
+
+    def _find_macos_app_bundle(self, directory: Path) -> Optional[Path]:
+        for candidate in directory.rglob("AMI.app"):
+            if candidate.is_dir() and (candidate / "Contents" / "MacOS").is_dir():
+                return candidate
+        return None
+
+    def _install_macos_app_bundle(self, current_exe: Path, new_bundle: Path) -> bool:
+        old_bundle = self._macos_bundle_root(current_exe)
+        if not old_bundle or not new_bundle.is_dir():
+            return False
+        parent = old_bundle.parent
+        script = parent / "_update_macos_app.sh"
+        pid = os.getpid()
+        app_name = old_bundle.name
+        dest_app = parent / app_name
+        q_parent = shlex.quote(str(parent))
+        q_old = shlex.quote(str(old_bundle))
+        q_new = shlex.quote(str(new_bundle))
+        q_dest = shlex.quote(str(dest_app))
+        script.write_text(
+            f"""#!/bin/bash
+set -e
+PID={pid}
+for i in $(seq 1 75); do kill -0 "$PID" 2>/dev/null || break; sleep 0.2; done
+sleep 0.35
+rm -rf {q_old}
+cp -R {q_new} {q_parent}/
+chmod +x {q_dest}/Contents/MacOS/AMI
+nohup open -n {q_dest} >/dev/null 2>&1 &
+sleep 0.5
+rm -f "$0"
+"""
+        )
+        script.chmod(0o755)
+        subprocess.Popen(["/bin/bash", str(script)])
+        return True
 
     def _install_windows(self, current_exe: Path, new_exe: Path) -> bool:
         batch = current_exe.parent / "_update.bat"

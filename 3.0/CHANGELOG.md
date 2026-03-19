@@ -10,6 +10,7 @@
 
 ## 3.1.4
 
+- **macOS packaging / Gatekeeper**: Build ufficiale come **`AMI.app`** (spec `ami_macos.spec`) con `Info.plist` (`CFBundleName` **AMI**, bundle id `tech.ciaoim.ami`) così Finder e i dialoghi di sicurezza non presentano più l’app come generico **Python**. Dopo la build viene eseguito **`codesign --deep`** (ad-hoc `-` di default, oppure variabile d’ambiente **`AMI_CODESIGN_IDENTITY`** per Developer ID). Lo ZIP release contiene **`AMI-Package/AMI.app`**. **OTA su macOS**: se nel pacchetto c’è `AMI.app`, l’installer sostituisce l’intero bundle e riavvia con `open -n`.
 - **Branding**: Copyright **© 2025–2026**; default `app.website` is **[ciaoim.tech/projects/ami](https://ciaoim.tech/projects/ami)** (full URL in `config.json`). Migration updates legacy `website: "ciaoim.tech"` and the previous one-line copyright string when loading config.
 - **Dashboard**: Footer shows copyright plus a clickable **ciaoim.tech** link (opens the configured site).
 - **About (tray)**: Copyright line from config; links to **ciaoim.tech** and **GitHub** repo.

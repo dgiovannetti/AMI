@@ -1,32 +1,38 @@
 # macOS Security & Gatekeeper Guide
 
+## ⚠️ "Apple non è in grado di verificare che **Python** non contenga malware…"
+
+Su alcune build precedenti, Gatekeeper mostrava **Python** perché il pacchetto PyInstaller appariva come interprete generico. **AMI 3.1.4** (build macOS attuale) viene distribuito come **`AMI.app`**: in Finder e nei dialoghi di sicurezza l’app si chiama **AMI — Active Monitor of Internet**, con `CFBundleName` / bundle id `tech.ciaoim.ami`. Dopo l’aggiornamento dello ZIP da GitHub, apri **`AMI.app`** dentro **`AMI-Package`**, non un file `AMI` sciolto.
+
+Senza **Developer ID** + **notarizzazione Apple**, macOS può comunque chiedere conferma al **primo avvio** (comportamento previsto per software scaricato fuori dal Mac App Store).
+
 ## 🔒 "Apple non può verificare che AMI non contenga malware"
 
-Questo messaggio è **normale** e **sicuro**. AMI non è firmato con un certificato Apple Developer ($99/anno), quindi macOS Gatekeeper lo blocca per precauzione.
+Questo messaggio è **normale** per app **non notarizzate**. AMI open source su GitHub non usa un certificato a pagamento Apple, quindi Gatekeeper può mostrare l’avviso per precauzione.
 
-**Nota:** AMI su macOS è un eseguibile UNIX (non un `.app` bundle), quindi appare come file generico in Finder.
+**Nota (3.1.4+):** la distribuzione macOS è il bundle **`AMI.app`** nella cartella **`AMI-Package`** estratta dallo ZIP della release.
 
 ## ✅ Soluzioni per aprire AMI
 
 ### Metodo 1: Click destro + Apri (Consigliato)
 
-1. **NON fare doppio click** su `AMI` (l'eseguibile UNIX)
-2. **Click destro** (o Ctrl+click) sul file
+1. Nella cartella **`AMI-Package`**, individua **`AMI.app`** (icona applicazione).
+2. **Click destro** (o Ctrl+click) su **`AMI.app`**
 3. Seleziona **"Apri"** dal menu contestuale
 4. Nel dialog che appare, clicca **"Apri"**
 5. ✅ L'app si avvierà e macOS la ricorderà come "sicura"
 
-**Questo bypass funziona solo la prima volta.** Dopo, puoi aprire AMI normalmente con doppio click.
+**Questo bypass funziona solo la prima volta.** Dopo, puoi aprire AMI con doppio click.
 
 ---
 
 ### Metodo 2: Impostazioni di Sistema
 
-1. Prova ad aprire `AMI` normalmente (verrà bloccato)
+1. Prova ad aprire **`AMI.app`** normalmente (verrà bloccato)
 2. Apri **Impostazioni di Sistema**
 3. Vai su **Privacy e Sicurezza**
 4. Scorri in basso fino a vedere:
-   > "AMI" è stato bloccato perché non proviene da uno sviluppatore identificato
+   > **"AMI"** (o messaggio su software non verificato) è stato bloccato…
 5. Clicca **"Apri comunque"**
 6. Conferma con **"Apri"**
 
@@ -40,20 +46,16 @@ Rimuovi l'attributo di quarantena da AMI:
 # Vai nella directory dove hai estratto AMI
 cd /path/to/AMI-Package
 
-# Rimuovi quarantena dall'eseguibile
-xattr -cr AMI
-
-# Rendi eseguibile (se necessario)
-chmod +x AMI
+# Rimuovi quarantena dal bundle .app
+xattr -cr AMI.app
 
 # Avvia l'app
-./AMI
+open AMI.app
 ```
 
 **Cosa fa questo comando:**
-- `xattr -cr`: Rimuove gli attributi estesi (extended attributes) di quarantena
-- `chmod +x`: Assicura che il file sia eseguibile
-- `./AMI`: Esegue l'applicazione
+- `xattr -cr`: Rimuove gli attributi estesi (extended attributes) di quarantena dal bundle
+- `open AMI.app`: Avvia l’applicazione come app macOS
 
 ---
 
@@ -109,11 +111,12 @@ Se vuoi distribuire AMI senza il warning di Gatekeeper, devi firmarlo.
 ### Firma l'app
 
 ```bash
-# Dopo aver buildato con PyInstaller
-codesign --force --sign "Developer ID Application: Your Name (TEAM_ID)" dist/AMI
+# Dopo aver buildato con PyInstaller (3.x da 3.0/)
+# Bundle .app:
+codesign --force --deep --sign "Developer ID Application: Your Name (TEAM_ID)" dist/AMI.app
 
 # Verifica la firma
-codesign --verify --verbose dist/AMI
+codesign --verify --verbose dist/AMI.app
 
 # Notarize (opzionale ma consigliato)
 xcrun notarytool submit dist/AMI-Package.zip \
@@ -160,7 +163,7 @@ Modifica `.github/workflows/build.yml`:
 Questo succede se l'attributo di quarantena è corrotto:
 
 ```bash
-xattr -cr /path/to/AMI-Package/AMI
+xattr -cr /path/to/AMI-Package/AMI.app
 ```
 
 ### "AMI" non può essere aperto perché lo sviluppatore non può essere verificato

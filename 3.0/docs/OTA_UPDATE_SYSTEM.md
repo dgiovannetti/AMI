@@ -57,3 +57,4 @@ Postponement count is stored in `~/.ami_update_postponed` (JSON with `count`). I
 
 - Version is taken from `ami.__version__`; no need to duplicate in `config.json` for the running app.
 - For 3.x releases, assets must be named like `AMI-v*-*-windows.zip` / `AMI-v*-*-macos.zip` (substring `windows` / `macos` + `.zip`). See `.github/workflows/release-3.0.yml`.
+- **macOS (3.1.4+):** the ZIP extracts to `AMI-Package/` containing **`AMI.app`**. The updater replaces the **entire `.app` bundle** and relaunches with `open -n`. Older flat `AMI` binaries in the zip are still supported as a fallback if no `AMI.app` is present.

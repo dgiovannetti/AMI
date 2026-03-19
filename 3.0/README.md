@@ -55,7 +55,7 @@ pip install -r requirements.txt pyinstaller
 python build.py
 ```
 
-Output: `dist/AMI-Package/` (onedir: `AMI.exe` on Windows, `AMI` on macOS, plus `config.json`, `config.schema.json`, `resources/`).
+Output: `dist/AMI-Package/` — **Windows:** onedir + `AMI.exe`; **macOS:** `AMI.app` bundle + `config.json`, `config.schema.json`, `resources/` (PyInstaller spec `ami_macos.spec`; firma ad-hoc con `codesign` se disponibile, oppure `AMI_CODESIGN_IDENTITY` per Developer ID).
 
 ### Windows (da root del repo)
 

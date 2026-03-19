@@ -22,9 +22,9 @@
 ### Download (this release)
 
 - **Windows:** `AMI-v3.1.4-windows.zip` → extract `AMI-Package/AMI.exe`
-- **macOS:** `AMI-v3.1.4-macos.zip` → extract `AMI-Package/AMI`
+- **macOS:** `AMI-v3.1.4-macos.zip` → extract `AMI-Package/AMI.app` (double-click **AMI.app**; see [MACOS_SECURITY.md](MACOS_SECURITY.md) if Gatekeeper prompts)
 
-Also attached: **`SHA256SUMS.txt`** (same hashes as in the notes below).
+Also attached: **`SHA256SUMS.txt`** (authoritative hashes; CI may also append a **Checksum OTA** block to the release body).
 
 ### Upgrade notes
 
@@ -42,19 +42,16 @@ Also attached: **`SHA256SUMS.txt`** (same hashes as in the notes below).
 
 ### Download
 
-- **Windows:** `AMI-v3.1.4-windows.zip`
-- **macOS:** `AMI-v3.1.4-macos.zip`
+- **Windows:** `AMI-v3.1.4-windows.zip` → `AMI-Package/AMI.exe`
+- **macOS:** `AMI-v3.1.4-macos.zip` → `AMI-Package/AMI.app` (bundle firmato ad-hoc in CI; messaggio “Python” in Gatekeeper mitigato rispetto al binario sciolto)
 
-In allegato anche **`SHA256SUMS.txt`**.
+In allegato anche **`SHA256SUMS.txt`** (hash aggiornati ogni volta che ricarichi gli ZIP sulla stessa tag).
 
 ---
 
 ### Checksum OTA (AMI updater)
 
-SHA256 delle zip (stesso contenuto del file `SHA256SUMS.txt` allegato). L'app usa queste righe per verificare il download.
-
-- `AMI-v3.1.4-macos.zip` → sha256:`007fda8f241d3aec46877186152afbd9ef6ab3f7d1cad79ad54dc3cf6e1efd6b`
-- `AMI-v3.1.4-windows.zip` → sha256:`e4708acca4bd4d3009ba960beb03f75b7f5ac556f3b9ef051bcc5bc4f080650d`
+Usa le righe in **`SHA256SUMS.txt`** allegato alla release (o il blocco **Checksum OTA** aggiunto dal workflow). Dopo ogni nuovo upload degli ZIP su **v3.1.4**, i valori SHA256 cambiano: non copiare hash obsoleti da commit precedenti.
 
 ---
 
