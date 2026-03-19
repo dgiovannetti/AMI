@@ -128,14 +128,39 @@ jobs:
             gh release delete-asset "$TAG" "$f" --repo "$REPO" -y 2>/dev/null || true
           done
 
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.rel.outputs.tag }}
-          files: |
-            release-zips/*.zip
-            release-zips/SHA256SUMS.txt
+      # softprops/action-gh-release a volte fallisce con "Server Error" sullo ZIP macOS (API transitoria).
+      - name: Upload release assets (gh CLI + retry per file)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.rel.outputs.tag }}"
+          REPO="${{ github.repository }}"
+          upload_with_retry() {
+            local file="$1"
+            local max=6
+            local n=1
+            while [ "$n" -le "$max" ]; do
+              if gh release upload "$TAG" "$file" --repo "$REPO" --clobber; then
+                echo "OK: uploaded $(basename "$file")"
+                return 0
+              fi
+              local wait=$((n * 20))
+              echo "WARN: upload failed for $(basename "$file") (attempt $n/$max), waiting ${wait}s..."
+              sleep "$wait"
+              n=$((n + 1))
+            done
+            echo "ERROR: gave up on $(basename "$file")"
+            return 1
+          }
+          cd release-zips
+          ls -la
+          test -f SHA256SUMS.txt || { echo "SHA256SUMS.txt missing"; exit 1; }
+          upload_with_retry SHA256SUMS.txt
+          shopt -s nullglob
+          for z in *.zip; do
+            upload_with_retry "$z"
+          done
 
       - name: Append OTA checksum block to release notes
         env:
