@@ -1,127 +1,58 @@
+# Builds AMI 3.x from 3.0/ (Windows + macOS). Does not attach to Releases — use release-3.0.yml on tags.
 name: Build AMI
 
 on:
   push:
-    branches: [ main, master ]
-    tags:
-      - 'v*'
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:  # Permette build manuale
-
-permissions:
-  contents: write
+    branches: [main, master]
+  workflow_dispatch:
 
 jobs:
   build-windows:
-    name: Build for Windows
+    name: Build for Windows (3.0)
     runs-on: windows-latest
-    
+    defaults:
+      run:
+        working-directory: 3.0
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements-build.txt
-    
-    - name: Generate icons (if present)
-      run: >
-        python -c "import os,runpy; p='tools/generate_icons.py';
-        runpy.run_path(p, run_name='__main__') if os.path.exists(p) else print('No icon generator found, skipping')"
-    
-    - name: Build executable
-      run: python build.py
-    
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: AMI-Windows
-        path: dist/AMI-Windows.zip
-        retention-days: 30
-    
-    - name: Create Release (if tag)
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
-      with:
-        files: dist/AMI-Windows.zip
-        name: AMI ${{ github.ref_name }}
-        body: |
-          ## AMI - Active Monitor of Internet
-          
-          **Version:** ${{ github.ref_name }}
-          
-          ### 📥 Download
-          - **Windows:** AMI-Windows.zip
-          
-          ### 🚀 Quick Start
-          1. Scarica `AMI-Windows.zip`
-          2. Estrai lo ZIP (troverai `AMI-Package/AMI.exe`)
-          3. Esegui `AMI.exe`
-          
-          ### ✨ Features
-          - 🟢 Monitor connessione in tempo reale
-          - 📊 Dashboard con grafici
-          - 📝 Logging eventi
-          - 💬 Notifiche Windows
-          - ⚙️ Altamente configurabile
-          
-          **"Sai se sei davvero online."**
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+      - name: Build executable
+        run: python build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AMI-Windows-3.0-Package
+          path: 3.0/dist/AMI-Package/
+          retention-days: 30
 
   build-macos:
-    name: Build for macOS
+    name: Build for macOS (3.0)
     runs-on: macos-latest
-    
+    defaults:
+      run:
+        working-directory: 3.0
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements-build.txt
-    
-    - name: Generate icons (if present)
-      run: |
-        python - <<'PY'
-        import os, runpy
-        p = 'tools/generate_icons.py'
-        if os.path.exists(p):
-            runpy.run_path(p, run_name='__main__')
-        else:
-            print('No icon generator found, skipping')
-        PY
-    
-    - name: Build executable
-      run: python build.py
-    
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: AMI-macOS
-        path: dist/AMI-macOS.zip
-        retention-days: 30
-    
-    - name: Create Release (if tag)
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
-      with:
-        files: dist/AMI-macOS.zip
-        name: AMI ${{ github.ref_name }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+      - name: Build executable
+        run: python build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AMI-macOS-3.0-Package
+          path: 3.0/dist/AMI-Package/
+          retention-days: 30

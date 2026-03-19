@@ -1,4 +1,5 @@
-# Build AMI 3.0 (runs from 3.0/ directory)
+# Build AMI 3.0 (runs from 3.0/ directory).
+# ZIP allegati alle GitHub Release sui tag: vedi release-3.0.yml
 name: Build AMI 3.0
 
 on:

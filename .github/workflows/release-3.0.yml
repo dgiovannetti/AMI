@@ -1,0 +1,117 @@
+# Build AMI 3.x from 3.0/ and attach Windows + macOS ZIPs to the GitHub Release for the tag.
+# Asset names must contain "windows" / "macos" (see ami.services.updater._find_platform_asset).
+name: Release AMI 3.0 (tag)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag esistente (es. v3.1.4) — la Release su GitHub deve già esistere"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            slug: windows
+          - os: macos-latest
+            slug: macos
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: 3.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
+
+      - name: Tag name for ZIP filenames
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "AMI_REL_TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
+          else
+            echo "AMI_REL_TAG=${GITHUB_REF#refs/tags/}" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build (PyInstaller)
+        run: python build.py
+
+      - name: Zip AMI-Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        run: |
+          $tag = $env:AMI_REL_TAG
+          if (-not $tag) { throw "AMI_REL_TAG empty" }
+          $zip = Join-Path "3.0/dist" ("AMI-$tag-windows.zip")
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path "3.0/dist/AMI-Package" -DestinationPath $zip -Force
+
+      - name: Zip AMI-Package (macOS)
+        if: runner.os == 'macOS'
+        working-directory: ${{ github.workspace }}
+        run: |
+          test -n "$AMI_REL_TAG" || exit 1
+          cd 3.0/dist && zip -r "AMI-${AMI_REL_TAG}-macos.zip" AMI-Package
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ami-release-zip-${{ matrix.slug }}
+          path: 3.0/dist/AMI-${{ env.AMI_REL_TAG }}-${{ matrix.slug }}.zip
+
+  upload-to-release:
+    name: Attach ZIPs to GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve GitHub Release tag
+        id: rel
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ami-release-zip-*
+          merge-multiple: true
+          path: release-zips
+
+      - name: Write SHA256SUMS
+        run: |
+          cd release-zips
+          sha256sum *.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.rel.outputs.tag }}
+          files: |
+            release-zips/*.zip
+            release-zips/SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

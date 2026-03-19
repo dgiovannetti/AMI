@@ -55,7 +55,13 @@ pip install -r requirements.txt pyinstaller
 python build.py
 ```
 
-Output: `dist/AMI-Package/` (and for onedir, the contents of `dist/AMI/` are copied into the package).
+Output: `dist/AMI-Package/` (onedir: `AMI.exe` on Windows, `AMI` on macOS, plus `config.json`, `config.schema.json`, `resources/`).
+
+### Windows (da root del repo)
+
+- Script: `build_windows.bat` (nella root, sopra `3.0/`).
+- In CI: workflow **Build AMI 3.0** (`.github/workflows/build-3.0.yml`), **Build Windows EXE (3.0)**, **Build AMI** — tutti usano `3.0/`.
+- Su ogni **tag `v*`** lo workflow **Release AMI 3.0** genera `AMI-<tag>-windows.zip` e `AMI-<tag>-macos.zip` e li allega alla GitHub Release (nomi compatibili con l’updater OTA). Puoi rilanciare a mano con *Run workflow* indicando un tag già esistente.
 
 ## Project structure
 

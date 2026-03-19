@@ -1,68 +1,63 @@
 @echo off
-REM AMI Build Script for Windows
-REM Builds AMI.exe from source
+REM AMI 3.x — build Windows executable from 3.0/ (PyInstaller onedir → dist\AMI-Package\AMI.exe)
+setlocal
+cd /d "%~dp0"
 
 echo ============================================================
-echo AMI - Active Monitor of Internet
-echo Windows Build Script
+echo AMI 3.x - Active Monitor of Internet
+echo Windows build (cartella 3.0)
 echo ============================================================
 echo.
 
-REM Check if Python is installed
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo ERROR: Python non trovato!
-    echo.
-    echo Installa Python da: https://www.python.org/downloads/
+    echo ERROR: Python non trovato. Installa da https://www.python.org/downloads/
     echo Assicurati di spuntare "Add Python to PATH"
     pause
     exit /b 1
 )
 
-echo Step 1: Installazione dipendenze...
+echo Step 1: Icone in resources (root) - opzionale...
+if exist "tools\generate_icons.py" (
+    python tools\generate_icons.py
+    if errorlevel 1 echo WARNING: generate_icons fallito, continuo...
+) else (
+    echo Nessun tools\generate_icons.py, salto.
+)
+
 echo.
+echo Step 2: Dipendenze AMI 3.0...
+set "REPO_ROOT=%~dp0"
+cd /d "%REPO_ROOT%3.0"
 python -m pip install --upgrade pip
 pip install -r requirements.txt
-pip install -r requirements-build.txt
-
+pip install pyinstaller
 if errorlevel 1 (
-    echo.
-    echo ERROR: Installazione dipendenze fallita!
+    echo ERROR: pip install fallito
+    cd /d "%~dp0"
     pause
     exit /b 1
 )
 
 echo.
-echo Step 2: Generazione icone...
-echo.
-python tools\generate_icons.py
-
-if errorlevel 1 (
-    echo.
-    echo WARNING: Generazione icone fallita, continuo...
-)
-
-echo.
-echo Step 3: Build eseguibile...
-echo.
+echo Step 3: PyInstaller build...
 python build.py
-
 if errorlevel 1 (
-    echo.
-    echo ERROR: Build fallito!
+    echo ERROR: build.py fallito
+    cd /d "%~dp0"
     pause
     exit /b 1
 )
 
+cd /d "%~dp0"
 echo.
 echo ============================================================
-echo Build completato con successo!
+echo Build completato.
 echo ============================================================
-echo.
-echo L'eseguibile si trova in: dist\AMI-Package\AMI.exe
+echo Eseguibile: 3.0\dist\AMI-Package\AMI.exe
 echo.
 echo Per testare:
-echo   cd dist\AMI-Package
+echo   cd 3.0\dist\AMI-Package
 echo   AMI.exe
 echo.
 pause

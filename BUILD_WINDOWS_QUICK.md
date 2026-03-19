@@ -1,43 +1,44 @@
-# 🪟 Build Windows - Guida Rapida
+# 🪟 Build Windows - Guida Rapida (AMI **3.x**)
 
-## ⚡ Comandi Veloci
+L’app attuale è in **`3.0/`**. Il vecchio build nella root (`python build.py` senza `cd 3.0`) è la linea 2.x.
 
-### Su Windows (PowerShell o CMD):
+## ⚡ Opzione A — Script automatico
+
+Dalla root del repo:
 
 ```cmd
-# 1. Clona/Aggiorna repository
+build_windows.bat
+```
+
+## ⚡ Opzione B — Comandi manuali
+
+```cmd
 git pull origin main
 
-# 2. Installa dipendenze (se necessario)
-pip install -r requirements.txt
-pip install -r requirements-build.txt
-
-# 3. Genera icone (se necessario)
+REM Icone (scrivono in resources\ alla root) — opzionale se già presenti
 python tools\generate_icons.py
 
-# 4. BUILD!
+REM Build AMI 3.x
+cd 3.0
+pip install -r requirements.txt
+pip install pyinstaller
 python build.py
-
-# Output: dist\AMI-Windows.zip (100-130MB)
 ```
+
+**Output:** `3.0\dist\AMI-Package\AMI.exe` (cartella onedir + `config.json`, `resources\`, ecc.)
+
+Per uno **ZIP** da allegare a una release (stesso layout delle CI): comprimi la cartella `3.0\dist\AMI-Package` oppure usa l’artifact **AMI-3.0-Windows-ZIP** / workflow **Release AMI 3.0** su GitHub Actions.
 
 ## ✅ Verifica Build
 
 ```cmd
-# Test eseguibile
-cd dist\AMI-Package
+cd 3.0\dist\AMI-Package
 AMI.exe
-
-# Dovrebbe:
-# - Apparire icona in system tray
-# - Aprire dashboard
-# - Mostrare versione 2.0.0
 ```
 
 ## 📦 File da Trasferire su Mac
 
-Dopo il build, trasferisci su Mac:
-- `dist\AMI-Windows.zip` (per release)
+- Cartella `3.0\dist\AMI-Package\` (o ZIP della cartella per release)
 
 ## 🔍 Checksum
 

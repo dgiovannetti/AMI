@@ -1,5 +1,9 @@
 # Changelog - AMI 3.0
 
+## Unreleased
+
+- **CI / Windows & release**: I workflow GitHub non usano più il vecchio build 2.x in root. **Windows e macOS** sono buildati da **`3.0/`** (`build.yml`, `build-windows.yml`, `build-3.0.yml`). Nuovo **`release-3.0.yml`**: su push **tag `v*`** (e opzionale *workflow_dispatch* con tag) produce ZIP `AMI-<tag>-windows.zip` / `AMI-<tag>-macos.zip` e li allega alla Release insieme a `SHA256SUMS.txt` (nomi asset compatibili con `UpdateManager._find_platform_asset`). **`build_windows.bat`** aggiornato per la cartella `3.0/`.
+
 ## 3.1.4
 
 - **Branding**: Copyright **© 2025–2026**; default `app.website` is **[ciaoim.tech/projects/ami](https://ciaoim.tech/projects/ami)** (full URL in `config.json`). Migration updates legacy `website: "ciaoim.tech"` and the previous one-line copyright string when loading config.
