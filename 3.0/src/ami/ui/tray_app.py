@@ -2,6 +2,7 @@
 AMI 3.0 - System tray application: menu, monitoring timer, lazy dashboard.
 """
 
+import html
 import os
 import sys
 import threading
@@ -487,14 +488,22 @@ class SystemTrayApp:
                 self.notifier.notify_message("AMI", f"Update check failed: {e}", level="warning", respect_enabled=False, play_sound=False)
 
     def show_about(self) -> None:
-        v = self.config["app"].get("version", __version__)
+        v = html.escape(self.config["app"].get("version", __version__))
+        app = self.config.get("app", {})
+        web = (app.get("website") or "https://ciaoim.tech/projects/ami").strip()
+        if web and not web.startswith(("http://", "https://")):
+            web = "https://" + web.lstrip("/")
+        web_esc = html.escape(web, quote=True)
+        copy_line = html.escape(app.get("copyright", "© 2025–2026 CiaoIM™ by Daniel Giovannetti"))
         about_text = f"""
         <h2>AMI - Active Monitor of Internet</h2>
         <p><b>Version:</b> {v}</p>
         <p><i>"Sai se sei davvero online."</i></p>
         <br>
-        <p>© 2025 <b>CiaoIM™</b> di Daniel Giovannetti</p>
-        <p><a href="https://ciaoim.tech">ciaoim.tech</a></p>
+        <p>{copy_line}</p>
+        <p><a href="{web_esc}">Sito — ciaoim.tech</a>
+        &nbsp;·&nbsp;
+        <a href="https://github.com/dgiovannetti/AMI">GitHub</a></p>
         """
         msg = QMessageBox()
         msg.setWindowTitle("About AMI")

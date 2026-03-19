@@ -66,7 +66,7 @@ class APIHandler(BaseHTTPRequestHandler):
 
     def send_health(self):
         _, config, _ = self._get_server_attrs()
-        version = "3.1.2"
+        version = "3.1.4"
         if config:
             version = config.get("app", {}).get("version", version)
         self.send_json_response({

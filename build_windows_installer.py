@@ -116,7 +116,7 @@ VSVersionInfo(
         StringStruct(u'FileDescription', u'AMI - Active Monitor of Internet'),
         StringStruct(u'FileVersion', u'2.1.1'),
         StringStruct(u'InternalName', u'AMI'),
-        StringStruct(u'LegalCopyright', u'© 2025 CiaoIM™ by Daniel Giovannetti. Apache 2.0 License'),
+        StringStruct(u'LegalCopyright', u'© 2025–2026 CiaoIM™ by Daniel Giovannetti. Apache 2.0 License'),
         StringStruct(u'OriginalFilename', u'AMI.exe'),
         StringStruct(u'ProductName', u'AMI'),
         StringStruct(u'ProductVersion', u'2.1.1')])
@@ -193,7 +193,7 @@ VSVersionInfo(
 
 For more information, see README.md
 
-© 2025 CiaoIM™ by Daniel Giovannetti
+© 2025–2026 CiaoIM™ by Daniel Giovannetti · https://ciaoim.tech/projects/ami
 """)
         
         # Create ZIP

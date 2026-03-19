@@ -11,12 +11,20 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.1.2-brightgreen" alt="Version"/>
+  <a href="https://ciaoim.tech/projects/ami"><strong>ciaoim.tech/projects/ami</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/dgiovannetti/AMI">GitHub</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-3.1.4-brightgreen" alt="Version"/>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-blue" alt="Platform"/>
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"/>
   <img src="https://img.shields.io/badge/status-public-success" alt="Status"/>
   <img src="https://img.shields.io/badge/accessibility-WCAG%202.1-purple" alt="Accessibility"/>
 </p>
+
+> **Current product line: AMI 3.x** — active development lives in **[`3.0/`](3.0/)** (PyQt6, themes, OTA, speed test). This README describes the project as a whole; for 3.x run/build details see **[`3.0/README.md`](3.0/README.md)** and **`ami.__version__`** (now **3.1.4**).
 
 ---
 
@@ -489,5 +497,7 @@ Choose alternatives if you:
 
 <p align="center">
   <strong>AMI - Active Monitor of Internet</strong><br>
-  "Sai se sei davvero online."
+  "Sai se sei davvero online."<br><br>
+  © 2025–2026 <strong>CiaoIM™</strong> by Daniel Giovannetti<br>
+  <a href="https://ciaoim.tech/projects/ami">ciaoim.tech/projects/ami</a>
 </p>

@@ -185,7 +185,7 @@ class SettingsDialog(QDialog):
         self.speed_test_timeout.setValue(int(st.get("timeout_seconds", 30)))
         self.speed_test_timeout.setSuffix(" s")
         layout.addRow("Timeout:", self.speed_test_timeout)
-        self.speed_test_url = QLineEdit(st.get("test_url", "https://speed.hetzner.de/100MB.bin"))
+        self.speed_test_url = QLineEdit(st.get("test_url", "https://fsn1-speed.hetzner.com/100MB.bin"))
         self.speed_test_url.setPlaceholderText(
             "Primary URL (≥ warmup + download). If it fails, AMI tries built-in fallbacks."
         )

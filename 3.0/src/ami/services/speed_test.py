@@ -23,9 +23,15 @@ _SPEED_HEADERS = {
     "Accept-Encoding": "identity",
 }
 
-# Large enough for warmup (20) + timed download (50) MB if user maxes settings
+# speed.hetzner.de is deprecated; use https://<region>-speed.hetzner.com/100MB.bin (Hetzner test files).
+# Other regions if primary fails; then non-Hetzner mirrors.
 _DEFAULT_FALLBACK_URLS: List[str] = [
-    "https://speed.hetzner.de/100MB.bin",
+    "https://nbg1-speed.hetzner.com/100MB.bin",
+    "https://hel1-speed.hetzner.com/100MB.bin",
+    "https://ash-speed.hetzner.com/100MB.bin",
+    "https://hil-speed.hetzner.com/100MB.bin",
+    "https://sin-speed.hetzner.com/100MB.bin",
+    "https://fsn1-speed.hetzner.com/100MB.bin",
     "https://proof.ovh.net/files/100Mb.dat",
     "http://ipv4.download.thinkbroadband.com:8080/50MB.zip",
     "https://speed.cloudflare.com/__down?bytes=104857600",

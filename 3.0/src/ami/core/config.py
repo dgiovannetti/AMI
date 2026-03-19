@@ -17,9 +17,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "app": {
         "name": "AMI",
         "subtitle": "Active Monitor of Internet",
-        "version": "3.1.2",
-        "copyright": "© 2025 CiaoIM™ by Daniel Giovannetti",
-        "website": "ciaoim.tech",
+        "version": "3.1.4",
+        "copyright": "© 2025–2026 CiaoIM™ by Daniel Giovannetti",
+        "website": "https://ciaoim.tech/projects/ami",
         "tagline": "Crafted logic. Measured force. Front-end vision, compiled systems, and hardcoded ethics.",
         "inspiration": "Intuizione colta insieme a Giovanni Calvario in aliscafo per il 40° Convegno di Capri dei Giovani Imprenditori",
     },
@@ -60,7 +60,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "speed_test": {
         "enabled": True,
         "interval_minutes": 30,
-        "test_url": "https://speed.hetzner.de/100MB.bin",
+        "test_url": "https://fsn1-speed.hetzner.com/100MB.bin",
         "download_size_mb": 10,
         "warmup_mb": 2,
         "timeout_seconds": 30,
@@ -129,7 +129,11 @@ def _migrate_from_2x(config: Dict[str, Any]) -> Dict[str, Any]:
     except (ValueError, IndexError):
         major = 0
     if major < 3:
-        app["version"] = "3.1.2"
+        app["version"] = "3.1.4"
+    if app.get("website") in ("ciaoim.tech", "www.ciaoim.tech"):
+        app["website"] = "https://ciaoim.tech/projects/ami"
+    if app.get("copyright") == "© 2025 CiaoIM™ by Daniel Giovannetti":
+        app["copyright"] = "© 2025–2026 CiaoIM™ by Daniel Giovannetti"
     mon = out.setdefault("monitoring", {})
     mon.setdefault("http_test_urls", [])
     api = out.setdefault("api", {})
@@ -140,7 +144,7 @@ def _migrate_from_2x(config: Dict[str, Any]) -> Dict[str, Any]:
     st = out.setdefault("speed_test", {
         "enabled": True,
         "interval_minutes": 30,
-        "test_url": "https://speed.hetzner.de/100MB.bin",
+        "test_url": "https://fsn1-speed.hetzner.com/100MB.bin",
         "download_size_mb": 10,
         "warmup_mb": 2,
         "timeout_seconds": 30,
@@ -149,11 +153,15 @@ def _migrate_from_2x(config: Dict[str, Any]) -> Dict[str, Any]:
     })
     st.setdefault("warmup_mb", 2)
     # Old 50 MB Cloudflare URL may be too small for max warmup (20) + download (50)
+    _hetzner_fsn1 = "https://fsn1-speed.hetzner.com/100MB.bin"
     if st.get("test_url") == "https://speed.cloudflare.com/__down?bytes=52428800":
-        st["test_url"] = "https://speed.hetzner.de/100MB.bin"
-    # Old proof.ovh default → Hetzner (reliable); AMI still tries fallbacks if primary fails
+        st["test_url"] = _hetzner_fsn1
+    # Deprecated global Hetzner host → region-specific (FSN1 default)
+    if "speed.hetzner.de" in str(st.get("test_url", "")):
+        st["test_url"] = _hetzner_fsn1
+    # Old proof.ovh default → Hetzner FSN1; AMI still tries fallbacks if primary fails
     if "proof.ovh" in str(st.get("test_url", "")):
-        st["test_url"] = "https://speed.hetzner.de/100MB.bin"
+        st["test_url"] = _hetzner_fsn1
         st["download_size_mb"] = 10
         st["timeout_seconds"] = 30
         st.setdefault("warmup_mb", 2)

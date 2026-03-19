@@ -1,12 +1,23 @@
 # Changelog - AMI 3.0
 
+## 3.1.4
+
+- **Branding**: Copyright **© 2025–2026**; default `app.website` is **[ciaoim.tech/projects/ami](https://ciaoim.tech/projects/ami)** (full URL in `config.json`). Migration updates legacy `website: "ciaoim.tech"` and the previous one-line copyright string when loading config.
+- **Dashboard**: Footer shows copyright plus a clickable **ciaoim.tech** link (opens the configured site).
+- **About (tray)**: Copyright line from config; links to **ciaoim.tech** and **GitHub** repo.
+- **Dashboard — GitHub**: Live **stargazers** count from the GitHub API (refresh on open + every 10 min, throttled), with links to the repo and **Star** (opens GitHub in the browser; starring still uses the site’s Star button when logged in).
+
+## 3.1.3
+
+- **Hetzner test files**: `speed.hetzner.de` is deprecated. Default `test_url` is now **FSN1** `https://fsn1-speed.hetzner.com/100MB.bin`. Built-in fallbacks include **nbg1**, **hel1**, **ash**, **hil**, **sin** regional endpoints (same `100MB.bin` path). Config migration rewrites old `speed.hetzner.de` URLs automatically.
+
 ## 3.1.2
 
 - **Speed test reliability**: If the primary `test_url` fails (e.g. Cloudflare `__down` returns 403), AMI tries built-in fallback mirrors (Hetzner, OVH, thinkbroadband) automatically.
 - **UI refresh**: After each speed test, the tray/dashboard refresh immediately via a queued signal (no need to wait for the next ping poll).
 - **Tray menu**: New **Speed test now** action; first scheduled test runs ~15 s after startup (was 60 s).
 - **HTTP**: `Accept-Encoding: identity` on speed test requests to avoid inflated byte counts from compression.
-- **Default `test_url`**: `https://speed.hetzner.de/100MB.bin` (works more reliably than Cloudflare for scripted clients); Cloudflare remains available as a fallback mirror.
+- **Default `test_url`**: Hetzner regional host (see 3.1.3); Cloudflare remains available as a fallback mirror.
 
 ## 3.1.1
 
