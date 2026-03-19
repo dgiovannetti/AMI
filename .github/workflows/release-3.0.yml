@@ -107,6 +107,17 @@ jobs:
           sha256sum *.zip > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
+      # Vecchi nomi senza versione confondono gli utenti (pacchetto diverso / binario "Python").
+      - name: Remove legacy duplicate assets from release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.rel.outputs.tag }}"
+          REPO="${{ github.repository }}"
+          for f in AMI-macOS.zip AMI-Windows.zip; do
+            gh release delete-asset "$TAG" "$f" --repo "$REPO" -y 2>/dev/null || true
+          done
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.rel.outputs.tag }}

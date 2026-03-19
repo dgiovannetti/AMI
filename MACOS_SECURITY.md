@@ -2,9 +2,17 @@
 
 ## ⚠️ "Apple non è in grado di verificare che **Python** non contenga malware…"
 
-Su alcune build precedenti, Gatekeeper mostrava **Python** perché il pacchetto PyInstaller appariva come interprete generico. **AMI 3.1.4** (build macOS attuale) viene distribuito come **`AMI.app`**: in Finder e nei dialoghi di sicurezza l’app si chiama **AMI — Active Monitor of Internet**, con `CFBundleName` / bundle id `tech.ciaoim.ami`. Dopo l’aggiornamento dello ZIP da GitHub, apri **`AMI.app`** dentro **`AMI-Package`**, non un file `AMI` sciolto.
+### Causa più comune (anche con AMI.app)
 
-Senza **Developer ID** + **notarizzazione Apple**, macOS può comunque chiedere conferma al **primo avvio** (comportamento previsto per software scaricato fuori dal Mac App Store).
+Se apri **Mostra contenuto pacchetto** → `Contents` → `MacOS` → file **`AMI`** (icona terminale / eseguibile nudo), macOS tratta quel file come **codice firmato in modo diverso** dall’app e spesso lo etichetta in modo generico (**Python** / motore PyInstaller). **Non usare quel file.** Torna indietro e fai doppio click su **`AMI.app`** (icona applicazione nella cartella `AMI-Package`).
+
+### Build attuale
+
+**AMI 3.1.4** si scarica come ZIP il cui nome contiene **`macos`** (es. `AMI-v3.1.4-macos.zip`). Dentro c’è **`AMI-Package/AMI.app`**. L’app ha bundle id `tech.ciaoim.ami` e nome **AMI** in Finder.
+
+**Evita** vecchi file tipo **`AMI-macOS.zip`** sulla stessa pagina Release (nomi senza versione): possono essere pacchetti diversi o obsoleti.
+
+Senza **Developer ID** + **notarizzazione Apple**, Gatekeeper può **comunque** mostrare un avviso al primo avvio: è normale per software non notarizzato scaricato da internet.
 
 ## 🔒 "Apple non può verificare che AMI non contenga malware"
 

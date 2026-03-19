@@ -68,7 +68,8 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    # Evita dipendenze pesanti opzionali (riduce .so / warning SDK su CI; matplotlib QtAgg non richiede scipy)
+    excludes=["scipy", "pandas", "IPython", "jupyter"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

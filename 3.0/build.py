@@ -10,6 +10,19 @@ import subprocess
 import sys
 from pathlib import Path
 
+# First 4 bytes of Mach-O / fat binaries (either endian)
+_MACHO_OR_FAT_MAGIC = frozenset(
+    {
+        0xFEEDFACE,
+        0xFEEDFACF,
+        0xCEFAEDFE,
+        0xCFFAEDFE,
+        0xCAFEBABE,
+        0xCAFEBABF,
+        0xBEBAFECA,
+    }
+)
+
 
 def check_requirements() -> bool:
     print("Checking requirements...")
@@ -43,17 +56,43 @@ def check_requirements() -> bool:
     return True
 
 
+def _is_macho_file(path: Path) -> bool:
+    try:
+        if not path.is_file():
+            return False
+        if path.stat().st_size < 4:
+            return False
+        with open(path, "rb") as f:
+            b = f.read(4)
+        le = int.from_bytes(b, "little")
+        be = int.from_bytes(b, "big")
+        return le in _MACHO_OR_FAT_MAGIC or be in _MACHO_OR_FAT_MAGIC
+    except OSError:
+        return False
+
+
 def _codesign_macos_app(app_path: Path) -> None:
-    """Ad-hoc (-) or Developer ID if AMI_CODESIGN_IDENTITY is set."""
+    """
+    Sign every Mach-O inside the bundle first, then the .app (recommended vs --deep alone).
+    Ad-hoc (-) still triggers Gatekeeper on quarantined downloads; Developer ID + notarization is the full fix.
+    """
     identity = os.environ.get("AMI_CODESIGN_IDENTITY", "-").strip() or "-"
-    cmd = [
-        "codesign",
-        "--force",
-        "--deep",
-        "--sign",
-        identity,
-        str(app_path),
-    ]
+    inner: list[Path] = []
+    for p in app_path.rglob("*"):
+        if p.is_file() and _is_macho_file(p):
+            inner.append(p)
+    inner.sort(key=lambda p: len(p.parts), reverse=True)
+    ts_none = identity == "-"
+    for p in inner:
+        cmd = ["codesign", "--force", "--sign", identity, str(p)]
+        if ts_none:
+            cmd.append("--timestamp=none")
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0:
+            print(f"[codesign inner warn] {p}: {r.stderr.strip() or r.stdout.strip()}")
+    cmd = ["codesign", "--force", "--sign", identity, str(app_path)]
+    if ts_none:
+        cmd.append("--timestamp=none")
     print(f"Running: {' '.join(cmd)}")
     subprocess.run(cmd, check=True, cwd=str(app_path.parent))
 
@@ -182,6 +221,35 @@ def create_package() -> None:
         if rsrc.exists():
             shutil.rmtree(rsrc)
         shutil.copytree(root / "resources", rsrc)
+    if sys.platform == "darwin":
+        readme = package_dir / "LEGGIMI_macOS.txt"
+        readme.write_text(
+            """AMI su macOS — leggi prima di aprire
+=====================================
+
+1) Avvia SOLO l’applicazione «AMI» (icona AMI.app).
+   Puoi trascinare AMI.app in Applicazioni e aprirla da lì.
+
+2) NON aprire il file «AMI» nudo dentro il pacchetto:
+   tasto destro su AMI.app → «Mostra contenuto pacchetto» → Contents → MacOS → AMI
+   Quello è solo il motore interno: macOS può mostrarlo come «Python» o dare errori.
+   Non è un bug di AMI: Finder non deve usare quel file direttamente.
+
+3) Download da browser (quarantena):
+   Apri Terminale, vai nella cartella AMI-Package (dove c’è AMI.app) e esegui:
+
+   xattr -cr AMI.app
+   open AMI.app
+
+4) Se Apple blocca ancora l’apertura:
+   Impostazioni → Privacy e sicurezza → scorri fino al messaggio su AMI → «Apri comunque».
+   Senza account Apple Developer (firma + notarizzazione) l’avviso può comparire al primo avvio.
+
+ZIP corretto dalla pagina Release: nome file deve contenere «macos», es. AMI-v3.1.4-macos.zip
+(non usare vecchi pacchetti «AMI-macOS.zip» se ancora presenti).
+""",
+            encoding="utf-8",
+        )
     print(f"[OK] Package: {package_dir}")
 
 
