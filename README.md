@@ -1,7 +1,7 @@
 # AMI - Active Monitor of Internet
 
 <p align="center">
-  <img src="resources/ami_logo.png" alt="AMI Logo" width="200"/>
+  <img src="3.0/resources/ami_logo.png" alt="AMI Logo" width="200"/>
 </p>
 
 <h3 align="center">"Sai se sei davvero online."</h3>

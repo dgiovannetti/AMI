@@ -2,7 +2,7 @@
 
 > **AMI 3.x (linea attuale):** sorgenti e PyInstaller sono in **`3.0/`**.  
 > Usa **`build_windows.bat`** dalla root del repo oppure i comandi in **`BUILD_WINDOWS_QUICK.md`**.  
-> Su GitHub Actions: **`build-3.0.yml`**, **`build-windows.yml`**, **`build.yml`** (branch `main`); per ogni **tag `v*`** lo workflow **`release-3.0.yml`** allega gli ZIP **Windows + macOS** alla Release (nomi con `windows` / `macos` per l’aggiornamento OTA).
+> Su GitHub Actions: **`build.yml`** (branch `main` / PR, path `3.0/**`); per ogni **tag `v*`** lo workflow **`release-3.0.yml`** allega gli ZIP **Windows + macOS** alla Release (nomi con `windows` / `macos` per l’aggiornamento OTA).
 
 La sezione *Procedura completa* qui sotto descrive ancora il layout **2.x** nella root (`pip install` + `python build.py` senza `cd 3.0`). Per 3.x **non** usare quel flusso: entra in **`3.0`** come nella quick guide.
 

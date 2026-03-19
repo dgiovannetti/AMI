@@ -37,3 +37,7 @@ ami_log.csv
 # OS
 .DS_Store
 Thumbs.db
+
+# Cursor / local
+.cursor/
+*.local

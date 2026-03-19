@@ -38,9 +38,14 @@ class UpdateDownloadThread(QThread):
 
     def run(self) -> None:
         try:
+
+            def report(pct: int) -> None:
+                self.progress.emit(pct)
+
             path = self.updater.download_update(
                 self.update_info["download_url"],
                 self.update_info.get("checksum"),
+                progress_callback=report,
             )
             if not path:
                 self.error.emit("Failed to download update")
@@ -60,6 +65,7 @@ class UpdateDialog(QDialog):
         self.updater = updater
         self.update_info = update_info
         self.download_thread = None
+        self._install_flow_started = False
         self.init_ui()
 
     def init_ui(self) -> None:
@@ -131,7 +137,7 @@ class UpdateDialog(QDialog):
         layout.addLayout(button_layout)
         self.setLayout(layout)
 
-    def postpone_update(self) -> None:
+    def _record_postpone_and_notify(self) -> None:
         self.updater.increment_postpone_count()
         remaining = self.updater.max_postponements - self.updater.get_postpone_count()
         if remaining > 0:
@@ -144,6 +150,9 @@ class UpdateDialog(QDialog):
                 self, "Last Postponement",
                 "This was your last postponement. Next time, the update will be mandatory.",
             )
+
+    def postpone_update(self) -> None:
+        self._record_postpone_and_notify()
         self.accept()
 
     def install_update(self) -> None:
@@ -154,13 +163,14 @@ class UpdateDialog(QDialog):
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
+        self._install_flow_started = True
         self.install_btn.setEnabled(False)
         self.postpone_btn.setEnabled(False)
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         self.download_thread = UpdateDownloadThread(self.updater, self.update_info)
         self.download_thread.progress.connect(self.progress_bar.setValue)
-        self.download_thread.finished.connect(self.on_finished)
+        self.download_thread.finished.connect(self._on_thread_finished)
         self.download_thread.error.connect(self.on_error)
         self.download_thread.start()
 
@@ -180,17 +190,47 @@ class UpdateDialog(QDialog):
             self.postpone_btn.setEnabled(self.updater.can_postpone())
             self.progress_bar.setVisible(False)
 
+    def _on_thread_finished(self, success: bool) -> None:
+        """Detach thread before on_finished so closeEvent / quit paths see a clean state."""
+        self.download_thread = None
+        self.on_finished(success)
+
     def on_error(self, error_msg: str) -> None:
         QMessageBox.critical(self, "Update Error", f"An error occurred:\n\n{error_msg}")
         self.install_btn.setEnabled(True)
         self.postpone_btn.setEnabled(self.updater.can_postpone())
         self.progress_bar.setVisible(False)
+        self.download_thread = None
 
     def closeEvent(self, event) -> None:
-        if not self.download_thread:
+        if self.download_thread is not None and self.download_thread.isRunning():
+            QMessageBox.warning(
+                self,
+                "Download in corso",
+                "Attendi il completamento del download prima di chiudere la finestra.",
+            )
+            event.ignore()
+            return
+        if self.download_thread is None and not self._install_flow_started:
             if not self.updater.can_postpone():
-                QMessageBox.warning(self, "Update Required", "This update is mandatory. Please install to continue.")
+                QMessageBox.warning(
+                    self,
+                    "Aggiornamento richiesto",
+                    "Questo aggiornamento è obbligatorio. Installa per continuare.",
+                )
                 event.ignore()
                 return
-            self.postpone_update()
+            self._record_postpone_and_notify()
+        elif (
+            self.download_thread is None
+            and self._install_flow_started
+            and not self.updater.can_postpone()
+        ):
+            QMessageBox.warning(
+                self,
+                "Aggiornamento obbligatorio",
+                "L'installazione non è riuscita. Riprova da «Install Update» o scarica manualmente da GitHub.",
+            )
+            event.ignore()
+            return
         event.accept()

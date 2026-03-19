@@ -93,6 +93,7 @@ class SystemTrayApp:
         self.update_icon("offline")
         self.updater = None
         self.update_timer = None
+        self._update_check_busy = False
         if self.config.get("updates", {}).get("enabled", True):
             github_repo = self.config.get("updates", {}).get("github_repo", "dgiovannetti/AMI")
             max_postpone = self.config.get("updates", {}).get("max_postponements", 3)
@@ -473,6 +474,17 @@ class SystemTrayApp:
     def check_for_updates(self, manual: bool = False) -> None:
         if not self.updater:
             return
+        if self._update_check_busy:
+            if manual:
+                self.notifier.notify_message(
+                    "AMI",
+                    "Controllo aggiornamenti già in corso.",
+                    level="info",
+                    respect_enabled=False,
+                    play_sound=False,
+                )
+            return
+        self._update_check_busy = True
         try:
             update_info = self.updater.check_for_updates()
             if update_info:
@@ -486,6 +498,8 @@ class SystemTrayApp:
         except Exception as e:
             if manual:
                 self.notifier.notify_message("AMI", f"Update check failed: {e}", level="warning", respect_enabled=False, play_sound=False)
+        finally:
+            self._update_check_busy = False
 
     def show_about(self) -> None:
         v = html.escape(self.config["app"].get("version", __version__))

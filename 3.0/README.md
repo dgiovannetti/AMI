@@ -60,7 +60,7 @@ Output: `dist/AMI-Package/` (onedir: `AMI.exe` on Windows, `AMI` on macOS, plus 
 ### Windows (da root del repo)
 
 - Script: `build_windows.bat` (nella root, sopra `3.0/`).
-- In CI: workflow **Build AMI 3.0** (`.github/workflows/build-3.0.yml`), **Build Windows EXE (3.0)**, **Build AMI** — tutti usano `3.0/`.
+- In CI: workflow **Build AMI** (`.github/workflows/build.yml`) — Windows + macOS da `3.0/` (su push/PR solo se cambiano `3.0/**` o il workflow; *workflow_dispatch* sempre disponibile).
 - Su ogni **tag `v*`** lo workflow **Release AMI 3.0** genera `AMI-<tag>-windows.zip` e `AMI-<tag>-macos.zip` e li allega alla GitHub Release (nomi compatibili con l’updater OTA). Puoi rilanciare a mano con *Run workflow* indicando un tag già esistente.
 
 ## Project structure

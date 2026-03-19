@@ -6,7 +6,7 @@
 
 - **OTA / updater**: `check_for_updates` gestisce `InvalidVersion`; checksum solo se stringa hex 64 caratteri (evita fallimenti da note release malformate); download con timeout `(connect, read)` e progress reale; cartella `extracted` ripulita prima di ogni estrazione; script Unix usa `nohup` al posto di `exec … &`. **Update dialog**: non chiudibile durante download attivo; niente «postpone» implicito dopo un tentativo di install fallito; aggiornamento obbligatorio: dopo fallimento la chiusura chiede di riprovare; thread resettato in modo coerente. **Tray**: un solo controllo aggiornamenti alla volta (`_update_check_busy`).
 
-- **CI / Windows & release**: I workflow GitHub non usano più il vecchio build 2.x in root. **Windows e macOS** sono buildati da **`3.0/`** (`build.yml`, `build-windows.yml`, `build-3.0.yml`). Nuovo **`release-3.0.yml`**: su push **tag `v*`** (e opzionale *workflow_dispatch* con tag) produce ZIP `AMI-<tag>-windows.zip` / `AMI-<tag>-macos.zip` e li allega alla Release insieme a `SHA256SUMS.txt` (nomi asset compatibili con `UpdateManager._find_platform_asset`). **`build_windows.bat`** aggiornato per la cartella `3.0/`. **Fix YAML**: `working-directory: "3.0"` (senza virgolette YAML interpretava `3.0` come numero e usava la cartella `3`).
+- **CI / Windows & release**: **Un solo workflow di integrazione** — **`build.yml`** (Windows + macOS da `3.0/`, con filtro path su `3.0/**` per evitare build duplicate). Rimossi i workflow ridondanti `build-3.0.yml` e `build-windows.yml`. **`release-3.0.yml`** invariato: su **tag `v*`** allega gli ZIP alla Release + `SHA256SUMS.txt`. **`build_windows.bat`** punta a `3.0/`. **YAML**: `working-directory: "3.0"` (quoted) per evitare che `3.0` sia interpretato come numero.
 
 ## 3.1.4
 
