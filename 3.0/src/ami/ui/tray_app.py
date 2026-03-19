@@ -36,6 +36,11 @@ def _is_pyinstaller_frozen() -> bool:
     return bool(getattr(sys, "frozen", False))
 
 
+def _tray_debug(msg: str) -> None:
+    if os.environ.get("AMI_DEBUG_TRAY", "").strip() in ("1", "true", "yes"):
+        print(f"[AMI tray] {msg}", file=sys.stderr, flush=True)
+
+
 def _effective_compact_status_window(config: dict) -> bool:
     """Default: off — menu bar + Dock; compact window only if explicitly enabled."""
     v = config.get("ui", {}).get("compact_status_window")
@@ -106,12 +111,21 @@ class SystemTrayApp:
         self.tray_icon.setToolTip("AMI - Starting...")
         self.create_menu()
         self.tray_icon.activated.connect(self.on_tray_activated)
-        self.tray_icon.show()
-        self.app.processEvents()
-        # Frozen .app: a volte il tray non applica l’icona al primo frame; riallinea dopo l’init Cocoa.
+        # Frozen .app: show() sincrono in __init__ può dare geometry altezza 0 (icona invisibile);
+        # il primo show dopo il prossimo tick eventi è molto più affidabile.
         if sys.platform == "darwin" and _is_pyinstaller_frozen():
-            QTimer.singleShot(250, self._reassert_macos_frozen_tray)
-            QTimer.singleShot(2000, self._reassert_macos_frozen_tray)
+            QTimer.singleShot(0, self._first_show_macos_frozen_tray)
+        else:
+            self.tray_icon.show()
+            self.app.processEvents()
+        _tray_debug(
+            f"frozen={_is_pyinstaller_frozen()} tray_available={QSystemTrayIcon.isSystemTrayAvailable()} "
+            f"icon_null={self.tray_icon.icon().isNull()}"
+        )
+        # Frozen .app: Cocoa a volte applica l’icona solo dopo altri giri eventi.
+        if sys.platform == "darwin" and _is_pyinstaller_frozen():
+            for ms in (50, 150, 400, 1000, 2500):
+                QTimer.singleShot(ms, self._reassert_macos_frozen_tray)
         if sys.platform == "darwin" and not QSystemTrayIcon.isSystemTrayAvailable():
             QMessageBox.warning(
                 None,
@@ -375,6 +389,20 @@ class SystemTrayApp:
             return self._darwin_frozen_bundle_tray_icon(path, status)
         return self._create_macos_template_tray_icon(status)
 
+    def _first_show_macos_frozen_tray(self) -> None:
+        try:
+            self._apply_tray_icon_for_status("offline")
+            self.tray_icon.setVisible(True)
+            self.tray_icon.show()
+            self.app.processEvents()
+            g = self.tray_icon.geometry()
+            _tray_debug(
+                f"first_show frozen geometry={g.x()},{g.y()},{g.width()}x{g.height()} "
+                f"icon_null={self.tray_icon.icon().isNull()}"
+            )
+        except Exception:
+            pass
+
     def _reassert_macos_frozen_tray(self) -> None:
         try:
             st = getattr(self, "current_status", None)
@@ -383,48 +411,62 @@ class SystemTrayApp:
             self.tray_icon.setVisible(True)
             self.tray_icon.show()
             self.app.processEvents()
+            g = self.tray_icon.geometry()
+            _tray_debug(
+                f"reassert status={key} icon_null={self.tray_icon.icon().isNull()} "
+                f"geometry={g.x()},{g.y()},{g.width()}x{g.height()}"
+            )
         except Exception:
             pass
 
     def _darwin_frozen_bundle_tray_icon(self, path: Path, status: str) -> QIcon:
-        """Icona a colori / PNG — compatibile con bundle PyInstaller (niente setIsMask)."""
-        if path.exists():
-            img = QImage(str(path))
+        """Frozen: QIcon da path file (Qt/Cocoa carica meglio del pixmap ridimensionato)."""
+        if path.is_file():
+            fp = os.fspath(path.resolve())
+            ic = QIcon(fp)
+            if not ic.isNull():
+                _tray_debug(f"tray icon from file: {fp}")
+                return ic
+            img = QImage(fp)
             if not img.isNull():
                 img = img.convertToFormat(QImage.Format.Format_ARGB32)
-                side = 44
-                img = img.scaled(
-                    side,
-                    side,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
-                pm = QPixmap.fromImage(img)
-                pm.setDevicePixelRatio(2.0)
-                return QIcon(pm)
+                for side in (22, 44, 66):
+                    scaled = img.scaled(
+                        side,
+                        side,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                    pm = QPixmap.fromImage(scaled)
+                    ic2 = QIcon()
+                    ic2.addPixmap(pm)
+                    if not ic2.isNull():
+                        _tray_debug(f"tray icon from scaled QPixmap side={side}")
+                        return ic2
+        _tray_debug(f"tray icon fallback colored (path was: {path})")
         return self._create_darwin_colored_tray_icon(status)
 
     def _create_darwin_colored_tray_icon(self, status: str) -> QIcon:
-        """Cerchio colorato piccolo @2x (fallback se mancano i PNG nel bundle)."""
-        dpr = 2.0
-        side = 44
-        pm = QPixmap(side, side)
-        pm.setDevicePixelRatio(dpr)
-        pm.fill(Qt.GlobalColor.transparent)
-        p = QPainter(pm)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        if status == "online":
-            fill = QColor(16, 185, 129, 255)
-        elif status == "unstable":
-            fill = QColor(245, 158, 11, 255)
-        else:
-            fill = QColor(239, 68, 68, 255)
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(fill)
-        m = 6
-        p.drawEllipse(m, m, side - 2 * m, side - 2 * m)
-        p.end()
-        return QIcon(pm)
+        """Cerchio colorato; niente devicePixelRatio (evita pixmap «vuoti» nel tray su alcuni macOS/Qt)."""
+        icon = QIcon()
+        for side in (16, 22, 32, 44):
+            pm = QPixmap(side, side)
+            pm.fill(Qt.GlobalColor.transparent)
+            p = QPainter(pm)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            if status == "online":
+                fill = QColor(16, 185, 129, 255)
+            elif status == "unstable":
+                fill = QColor(245, 158, 11, 255)
+            else:
+                fill = QColor(239, 68, 68, 255)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(fill)
+            m = max(2, side // 6)
+            p.drawEllipse(m, m, side - 2 * m, side - 2 * m)
+            p.end()
+            icon.addPixmap(pm)
+        return icon
 
     def _create_macos_template_tray_icon(self, status: str) -> QIcon:
         """Silhouette nera + setIsMask(True): macOS applica tint chiaro/scuro alla menu bar."""
