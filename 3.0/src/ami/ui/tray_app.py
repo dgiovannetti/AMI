@@ -9,7 +9,7 @@ import threading
 from pathlib import Path
 
 from PyQt6.QtCore import QObject, QTimer, Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
+from PyQt6.QtGui import QAction, QColor, QCursor, QIcon, QImage, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
     QMenu,
@@ -30,6 +30,18 @@ from ami.ui.compact_status import CompactStatusWindow
 from ami.ui.settings_dialog import SettingsDialog
 from ami.ui.splash_screen import UltraModernSplashScreen
 from ami.ui.update_dialog import UpdateDialog
+
+
+def _is_pyinstaller_frozen() -> bool:
+    return bool(getattr(sys, "frozen", False))
+
+
+def _effective_compact_status_window(config: dict) -> bool:
+    """Default: off — menu bar + Dock; compact window only if explicitly enabled."""
+    v = config.get("ui", {}).get("compact_status_window")
+    if v is None:
+        return False
+    return bool(v)
 
 
 class _SpeedTestDoneBridge(QObject):
@@ -57,40 +69,17 @@ class MonitorThread(QThread):
 
 class SystemTrayApp:
     def __init__(self) -> None:
+        try:
+            QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
+        except (AttributeError, TypeError):
+            pass
         self.app = QApplication(sys.argv)
         self.app.setQuitOnLastWindowClosed(False)
+        self.app.applicationStateChanged.connect(self._on_application_state_changed)
         self.config = self.load_config()
         app_version = self.config.get("app", {}).get("version", __version__)
-        self.splash = UltraModernSplashScreen(version=app_version)
-        self.splash.show()
-        self.splash.showMessage("Loading configuration...")
-        self.app.processEvents()
-        self.splash.showMessage("Initializing network monitor...")
-        self.app.processEvents()
-        self.monitor = NetworkMonitor(self.config)
-        self.splash.showMessage("Starting logger...")
-        self.app.processEvents()
-        self.logger = EventLogger(self.config)
-        self.splash.showMessage("Preparing notifications...")
-        self.app.processEvents()
-        self.notifier = Notifier(self.config)
-        self.splash.showMessage("Starting API server...")
-        self.app.processEvents()
-        self.api_server = APIServer(self.config, self.monitor)
-        self.current_status = None
-        self.monitor_thread = None
-        self.splash.showMessage("Finalizing...")
-        self.app.processEvents()
-        self.api_server.start()
-        self.tray_icon = QSystemTrayIcon()
-        red_path = get_base_path() / "resources" / "status_red.png"
-        if red_path.exists():
-            self.tray_icon.setIcon(QIcon(str(red_path)))
-        else:
-            self.tray_icon.setIcon(self._create_icon("red"))
-        self.tray_icon.setToolTip("AMI - Starting...")
-        self.notifier.tray_icon = self.tray_icon
-        self.update_icon("offline")
+        use_compact = _effective_compact_status_window(self.config)
+
         self.updater = None
         self.update_timer = None
         self._update_check_busy = False
@@ -108,17 +97,68 @@ class SystemTrayApp:
             self.update_timer = QTimer()
             self.update_timer.timeout.connect(lambda: self.check_for_updates(False))
             self.update_timer.start(check_interval * 3600 * 1000)
+
+        # Tray subito: su macOS l’icona 512px / PNG colorati spesso non compaiono in menu bar
+        self.tray_icon = QSystemTrayIcon(self.app)
+        self._apply_tray_icon_for_status("offline")
+        self.tray_icon.setToolTip("AMI - Starting...")
         self.create_menu()
         self.tray_icon.activated.connect(self.on_tray_activated)
+        self.tray_icon.show()
+        self.app.processEvents()
+        # Frozen .app: a volte il tray non applica l’icona al primo frame; riallinea dopo l’init Cocoa.
+        if sys.platform == "darwin" and _is_pyinstaller_frozen():
+            QTimer.singleShot(250, self._reassert_macos_frozen_tray)
+            QTimer.singleShot(2000, self._reassert_macos_frozen_tray)
+        if sys.platform == "darwin" and not QSystemTrayIcon.isSystemTrayAvailable():
+            QMessageBox.warning(
+                None,
+                "AMI",
+                "L’area tray della menu bar non risulta disponibile.\n\n"
+                "• Controlla le icone nascoste dietro «>>» in alto a destra.\n"
+                "• Impostazioni → Controllo Centro → Menu bar.\n"
+                "• Resta la finestra compatta «AMI» se abilitata.",
+            )
+
+        # Splash solo se la finestra compatta è disattivata (evita doppia UI all’avvio).
+        self.splash = None
+        self._splash_closed = True
+        self._splash_closable = False
+        if not use_compact:
+            self._splash_closed = False
+            self.splash = UltraModernSplashScreen(version=app_version)
+            self.splash.show()
+            self.splash.showMessage("Loading configuration...")
+            self.app.processEvents()
+
+        def splash_msg(msg: str) -> None:
+            if self.splash:
+                self.splash.showMessage(msg)
+
+        splash_msg("Initializing network monitor...")
+        self.app.processEvents()
+        self.monitor = NetworkMonitor(self.config)
+        splash_msg("Starting logger...")
+        self.app.processEvents()
+        self.logger = EventLogger(self.config)
+        splash_msg("Preparing notifications...")
+        self.app.processEvents()
+        self.notifier = Notifier(self.config)
+        self.notifier.tray_icon = self.tray_icon
+        splash_msg("Starting API server...")
+        self.app.processEvents()
+        self.api_server = APIServer(self.config, self.monitor)
+        self.current_status = None
+        self.monitor_thread = None
+        splash_msg("Finalizing...")
+        self.app.processEvents()
+        self.api_server.start()
+        self.update_icon("offline")
         interval = self.config["monitoring"]["polling_interval"] * 1000
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_connection)
         self.timer.start(interval)
-        self.tray_icon.show()
         self.compact_status = None
-        use_compact = self.config.get("ui", {}).get("compact_status_window")
-        if use_compact is None:
-            use_compact = sys.platform == "darwin"
         if use_compact:
             self.compact_status = CompactStatusWindow(self.config, self.monitor, self.tray_icon)
             self.compact_status.show()
@@ -135,10 +175,10 @@ class SystemTrayApp:
             self.speed_test_timer.timeout.connect(self._run_speed_test)
             self.speed_test_timer.start(interval_ms)
             QTimer.singleShot(15000, self._run_speed_test)
-        self._splash_closed = False
-        self._splash_closable = False
-        QTimer.singleShot(1500, self._allow_splash_close)
-        QTimer.singleShot(3000, self.close_splash)
+        if self.splash:
+            self._splash_closable = False
+            QTimer.singleShot(1500, self._allow_splash_close)
+            QTimer.singleShot(3000, self.close_splash)
         if self.config.get("ui", {}).get("show_dashboard_on_start", False) or os.environ.get("AMI_FORCE_DASHBOARD") == "1":
             QTimer.singleShot(2500, self.show_dashboard)
 
@@ -151,8 +191,52 @@ class SystemTrayApp:
         if self._splash_closed:
             return
         self._splash_closed = True
-        if hasattr(self, "splash"):
+        if self.splash is not None:
             self.splash.fade_out()
+
+    def _main_ui_is_visible(self) -> bool:
+        """True se c’è almeno una finestra principale visibile (esclusi menu popup)."""
+        for w in self.app.topLevelWidgets():
+            if not w.isVisible():
+                continue
+            if isinstance(w, QMenu):
+                continue
+            if self.splash is not None and w is self.splash:
+                return True
+            return True
+        return False
+
+    def _on_application_state_changed(self, state: Qt.ApplicationState) -> None:
+        """Dock: se non resta nulla in primo piano, riapri compatta o dashboard."""
+        if sys.platform != "darwin":
+            return
+        if state != Qt.ApplicationState.ApplicationActive:
+            return
+        if self._main_ui_is_visible():
+            return
+        if _effective_compact_status_window(self.config) and getattr(self, "compact_status", None):
+            self.compact_status.show()
+            self.compact_status.raise_()
+            self.compact_status.activateWindow()
+            return
+        self.show_dashboard()
+
+    def show_compact_status_window(self) -> None:
+        if not _effective_compact_status_window(self.config):
+            self.tray_icon.showMessage(
+                "AMI",
+                "Enable “Compact status window” in Settings → UI, or use Dashboard from the menu.",
+                QSystemTrayIcon.MessageIcon.Information,
+                4000,
+            )
+            return
+        if self.compact_status is None:
+            self.compact_status = CompactStatusWindow(self.config, self.monitor, self.tray_icon)
+            if self.current_status:
+                self.compact_status.update_status(self.current_status)
+        self.compact_status.show()
+        self.compact_status.raise_()
+        self.compact_status.activateWindow()
 
     def load_config(self) -> dict:
         self.base_path = get_base_path()
@@ -201,7 +285,7 @@ class SystemTrayApp:
         self.api_server.port = new_config["api"].get("port", 7212)
         self.api_server.auth_token = (new_config["api"].get("auth_token") or "").strip()
         self.api_server.start()
-        use_compact = new_config.get("ui", {}).get("compact_status_window", False)
+        use_compact = _effective_compact_status_window(new_config)
         if use_compact and not getattr(self, "compact_status", None):
             self.compact_status = CompactStatusWindow(self.config, self.monitor, self.tray_icon)
             self.compact_status.show()
@@ -243,6 +327,7 @@ class SystemTrayApp:
         self.speed_action.setEnabled(False)
         menu.addAction(self.speed_action)
         menu.addSeparator()
+        menu.addAction("📌 Show status window").triggered.connect(self.show_compact_status_window)
         menu.addAction("🔄 Test Now").triggered.connect(self.manual_test)
         menu.addAction("⚡ Speed test now").triggered.connect(self._speed_test_now)
         menu.addAction("📊 Dashboard").triggered.connect(self.show_dashboard)
@@ -257,8 +342,118 @@ class SystemTrayApp:
         menu.addAction("❌ Exit").triggered.connect(self.exit_app)
         self.tray_icon.setContextMenu(menu)
 
+    def _apply_tray_icon_for_status(self, status: str) -> None:
+        """Icona tray prima dell’init pesante (menu bar macOS)."""
+        path = get_base_path() / "resources" / {
+            "online": "status_green.png",
+            "unstable": "status_yellow.png",
+        }.get(status, "status_red.png")
+        self.tray_icon.setIcon(self._resolve_tray_icon(path, status))
+
+    def _resolve_tray_icon(self, path: Path, status: str) -> QIcon:
+        if sys.platform != "darwin":
+            if path.exists():
+                return QIcon(str(path))
+            return self._create_icon(
+                "green" if status == "online" else "yellow" if status == "unstable" else "red"
+            )
+        # PyInstaller .app: QIcon.setIsMask(True) da QPixmap può dare icona completamente invisibile nel tray.
+        if _is_pyinstaller_frozen():
+            return self._darwin_frozen_bundle_tray_icon(path, status)
+        return self._create_macos_template_tray_icon(status)
+
+    def _reassert_macos_frozen_tray(self) -> None:
+        try:
+            st = getattr(self, "current_status", None)
+            key = st.status if st and getattr(st, "status", None) else "offline"
+            self._apply_tray_icon_for_status(key)
+            self.tray_icon.setVisible(True)
+            self.tray_icon.show()
+            self.app.processEvents()
+        except Exception:
+            pass
+
+    def _darwin_frozen_bundle_tray_icon(self, path: Path, status: str) -> QIcon:
+        """Icona a colori / PNG — compatibile con bundle PyInstaller (niente setIsMask)."""
+        if path.exists():
+            img = QImage(str(path))
+            if not img.isNull():
+                img = img.convertToFormat(QImage.Format.Format_ARGB32)
+                side = 44
+                img = img.scaled(
+                    side,
+                    side,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+                pm = QPixmap.fromImage(img)
+                pm.setDevicePixelRatio(2.0)
+                return QIcon(pm)
+        return self._create_darwin_colored_tray_icon(status)
+
+    def _create_darwin_colored_tray_icon(self, status: str) -> QIcon:
+        """Cerchio colorato piccolo @2x (fallback se mancano i PNG nel bundle)."""
+        dpr = 2.0
+        side = 44
+        pm = QPixmap(side, side)
+        pm.setDevicePixelRatio(dpr)
+        pm.fill(Qt.GlobalColor.transparent)
+        p = QPainter(pm)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if status == "online":
+            fill = QColor(16, 185, 129, 255)
+        elif status == "unstable":
+            fill = QColor(245, 158, 11, 255)
+        else:
+            fill = QColor(239, 68, 68, 255)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(fill)
+        m = 6
+        p.drawEllipse(m, m, side - 2 * m, side - 2 * m)
+        p.end()
+        return QIcon(pm)
+
+    def _create_macos_template_tray_icon(self, status: str) -> QIcon:
+        """Silhouette nera + setIsMask(True): macOS applica tint chiaro/scuro alla menu bar."""
+        dpr = 2.0
+        side = 44
+        pm = QPixmap(side, side)
+        pm.setDevicePixelRatio(dpr)
+        pm.fill(Qt.GlobalColor.transparent)
+        p = QPainter(pm)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        black = QColor(0, 0, 0, 255)
+        cx = cy = side / 2.0
+        if status == "online":
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(black)
+            p.drawEllipse(int(cx - 8), int(cy - 8), 16, 16)
+        elif status == "unstable":
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(black)
+            p.drawEllipse(int(cx - 10), int(cy - 10), 20, 20)
+            p.setCompositionMode(QPainter.CompositionMode.CompositionMode_DestinationOut)
+            p.setBrush(QColor(255, 255, 255, 255))
+            p.drawEllipse(int(cx - 5), int(cy - 5), 10, 10)
+        else:
+            pen = QPen(black)
+            pen.setWidthF(3.0)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            p.setPen(pen)
+            m = 10.0
+            p.drawLine(int(m), int(m), int(side - m), int(side - m))
+            p.drawLine(int(side - m), int(m), int(m), int(side - m))
+        p.end()
+        ic = QIcon(pm)
+        ic.setIsMask(True)
+        return ic
+
     def _create_icon(self, color: str) -> QIcon:
-        pixmap = QPixmap(512, 512)
+        side = 512
+        margin = 16
+        ellipse = side - 2 * margin
+        sym_pt = 280
+        pixmap = QPixmap(side, side)
         pixmap.fill(Qt.GlobalColor.transparent)
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -273,22 +468,19 @@ class SystemTrayApp:
             symbol = "✕"
         painter.setBrush(main_color)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(16, 16, 480, 480)
+        painter.drawEllipse(margin, margin, ellipse, ellipse)
         painter.setPen(QColor(255, 255, 255))
         font = painter.font()
-        font.setPointSize(280)
+        font.setPointSize(sym_pt)
         font.setBold(True)
         painter.setFont(font)
-        painter.drawText(16, 16, 480, 480, Qt.AlignmentFlag.AlignCenter, symbol)
+        painter.drawText(0, 0, side, side, Qt.AlignmentFlag.AlignCenter, symbol)
         painter.end()
         return QIcon(pixmap)
 
     def update_icon(self, status: str) -> None:
         path = get_base_path() / "resources" / {"online": "status_green.png", "unstable": "status_yellow.png"}.get(status, "status_red.png")
-        if path.exists():
-            self.tray_icon.setIcon(QIcon(str(path)))
-        else:
-            self.tray_icon.setIcon(self._create_icon("green" if status == "online" else "yellow" if status == "unstable" else "red"))
+        self.tray_icon.setIcon(self._resolve_tray_icon(path, status))
 
     def update_tooltip(self, status) -> None:
         parts = ["AMI - Active Monitor of Internet", f"{'🟢' if status.status == 'online' else '🟡' if status.status == 'unstable' else '🔴'} {status.status.upper()}"]
@@ -431,6 +623,12 @@ class SystemTrayApp:
                 self.dashboard.hide()
             else:
                 self.show_dashboard()
+            return
+        # macOS: click sinistro sul tray apre il menu (scopribilità se l’icona è piccola).
+        if sys.platform == "darwin" and reason == QSystemTrayIcon.ActivationReason.Trigger:
+            m = self._tray_menu
+            if m:
+                m.popup(QCursor.pos())
 
     def show_dashboard(self) -> None:
         if self.dashboard is None:
