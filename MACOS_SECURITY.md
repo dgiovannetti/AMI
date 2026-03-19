@@ -166,6 +166,10 @@ Modifica `.github/workflows/build.yml`:
 
 ## 🆘 Troubleshooting
 
+### L’app si chiude subito (crash report: `CFBundleCopyBundleURL` / `QtCore` / `EXC_BAD_ACCESS`)
+
+Succedeva con Qt 6 nel bundle PyInstaller se i **plugin Qt** non erano risolti prima del caricamento di PyQt6. Nelle build **≥ 3.1.4** da GitHub è incluso il bootstrap (`QT_PLUGIN_PATH` / `QT_QPA_PLATFORM_PLUGIN_PATH`). Se usi una build vecchia, **scarica di nuovo** lo ZIP macOS dalla release aggiornata.
+
 ### "L'app è danneggiata e non può essere aperta"
 
 Questo succede se l'attributo di quarantena è corrotto:

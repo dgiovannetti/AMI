@@ -67,7 +67,7 @@ a = Analysis(
     + matplotlib_hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[str(ROOT / "pyi_rth_pyqt6_macos.py")],
     # Evita dipendenze pesanti opzionali (riduce .so / warning SDK su CI; matplotlib QtAgg non richiede scipy)
     excludes=["scipy", "pandas", "IPython", "jupyter"],
     win_no_prefer_redirects=False,
