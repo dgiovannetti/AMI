@@ -40,7 +40,14 @@ The updater looks for assets whose name contains the platform and ends with `.zi
 
 ## Checksum verification
 
-If the release body contains a line with `sha256` and a value (e.g. `SHA256: abc123...`), the downloaded file is verified before installation. Mismatch causes the update to be aborted.
+The updater resolves the SHA256 for **the ZIP asset you download** (Windows/macOS) from the GitHub release **body**:
+
+1. **sha256sum-style lines** copied into the notes: `deadbeef...  AMI-vX.Y.Z-windows.zip`
+2. **CI-appended block** (workflow `release-3.0.yml`): each line lists the filename and `sha256:`\`64-hex\`` in markdown.
+
+If no valid 64-character hex hash is found for that filename, verification is skipped (download still works). Mismatch aborts the update.
+
+Maintainership: after each tagged release, the workflow uploads `SHA256SUMS.txt` and appends a `### Checksum OTA (AMI updater)` section so clients can verify.
 
 ## Postponement storage
 
@@ -49,4 +56,4 @@ Postponement count is stored in `~/.ami_update_postponed` (JSON with `count`). I
 ## 3.0–specific notes
 
 - Version is taken from `ami.__version__`; no need to duplicate in `config.json` for the running app.
-- For 3.0 releases, build and publish artifacts from the `3.0/` folder (e.g. `AMI-Windows.zip`, `AMI-macOS.zip`) so the OTA updater downloads the correct package.
+- For 3.x releases, assets must be named like `AMI-v*-*-windows.zip` / `AMI-v*-*-macos.zip` (substring `windows` / `macos` + `.zip`). See `.github/workflows/release-3.0.yml`.

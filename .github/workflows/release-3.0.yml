@@ -115,3 +115,33 @@ jobs:
             release-zips/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Append OTA checksum block to release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.rel.outputs.tag }}"
+          EXISTING="$(gh release view "$TAG" --repo "${{ github.repository }}" --json body -q .body 2>/dev/null || true)"
+          if echo "$EXISTING" | grep -qF "### Checksum OTA (AMI updater)"; then
+            echo "Release notes already contain OTA checksum block; skipping append."
+          else
+            {
+              echo ""
+              echo "### Checksum OTA (AMI updater)"
+              echo ""
+              echo "SHA256 delle zip (stesso contenuto del file \`SHA256SUMS.txt\` allegato). L'app usa queste righe per verificare il download."
+              echo ""
+              while IFS= read -r line || [ -n "$line" ]; do
+                [ -z "${line// }" ] && continue
+                hash=$(echo "$line" | awk '{print $1}')
+                fn=$(echo "$line" | awk '{print $2}')
+                fn="${fn#\*}"
+                echo "- \`$fn\` → sha256:\`$hash\`"
+              done < release-zips/SHA256SUMS.txt
+              echo ""
+            } > /tmp/ami-ota-append.md
+            printf '%s\n' "$EXISTING" > /tmp/ami-release-body.md
+            cat /tmp/ami-ota-append.md >> /tmp/ami-release-body.md
+            gh release edit "$TAG" --repo "${{ github.repository }}" --notes-file /tmp/ami-release-body.md
+          fi

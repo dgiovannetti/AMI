@@ -1,57 +1,65 @@
 # AMI v3.1.4 — *Sai se sei davvero online.*
 
 <p align="center">
-  <strong>Branding refresh · GitHub pulse · Home on the web</strong>
+  <strong>Branding refresh · GitHub pulse · landing &amp; OTA</strong>
 </p>
 
 ---
 
 ## English
 
-**AMI 3.1.4** polishes how the app presents itself and connects you to the project—without changing the core you rely on for real connectivity checks.
+**AMI 3.1.4** polishes presentation (copyright 2025–2026, footer links, live GitHub stars on the dashboard) while keeping the same monitoring core (ping + HTTP, LAN vs internet, speed test, themes).
 
 ### Highlights
 
 | | |
 | --- | --- |
-| **© 2025–2026** | Copyright range updated across config defaults, About, and docs. |
-| **Official site** | One tap to **[ciaoim.tech/projects/ami](https://ciaoim.tech/projects/ami)** from the dashboard footer and the tray **About** dialog (driven by `app.website` in `config.json`). |
-| **GitHub stars** | Dashboard shows a **live star count** for this repo, auto-refreshed (on open + every 10 minutes, rate-friendly). Links to the repo and a **Star** shortcut that opens GitHub—log in there and tap **Star** on the page. |
-| **Docs** | Root `README` badge and copy point to **3.1.4** and the current **3.0/** tree. |
+| **© 2025–2026** | Copyright range in defaults, About, LICENSE/NOTICE, and docs. |
+| **Landing** | Pagina progetto: [`index.html`](https://github.com/dgiovannetti/AMI/blob/main/index.html) nel repo (es. GitHub Pages se abilitato). |
+| **GitHub stars** | Dashboard shows a **live star count** for this repo (refresh on open + every ~10 min). |
+| **OTA** | Release workflow appends a **Checksum OTA** block below; the app matches **your platform ZIP** and verifies **SHA256** before install. |
+
+### Download (this release)
+
+- **Windows:** `AMI-v3.1.4-windows.zip` → extract `AMI-Package/AMI.exe`
+- **macOS:** `AMI-v3.1.4-macos.zip` → extract `AMI-Package/AMI`
+
+Also attached: **`SHA256SUMS.txt`** (same hashes as in the notes below).
 
 ### Upgrade notes
 
-- Existing configs: if `website` was the short host `ciaoim.tech`, it migrates to the full AMI project URL on load.
-- Full changelog: [`3.0/CHANGELOG.md`](3.0/CHANGELOG.md).
+- Config migration updates legacy `website` / copyright strings when loading. Full log: [`3.0/CHANGELOG.md`](3.0/CHANGELOG.md).
 
-### Install
+### Install from source
 
-- **From source:** `cd 3.0 && pip install -r requirements.txt && PYTHONPATH=src python -m ami.main`
-- **Binaries:** grab **AMI-Package** artifacts from CI for this tag when available, or build with `python build.py` inside `3.0/`.
+`cd 3.0 && pip install -r requirements.txt && PYTHONPATH=src python -m ami.main`
 
 ---
 
 ## Italiano
 
-**AMI 3.1.4** rifinisce presentazione e collegamenti al progetto, mantenendo invariata la logica di monitoraggio (ping + HTTP, LAN vs Internet).
+**AMI 3.1.4** aggiorna marchio e collegamenti (copyright, stelle GitHub in dashboard) senza cambiare il motore di monitoraggio.
 
-### In sintesi
+### Download
 
-- **Copyright © 2025–2026** su default, About e documentazione.
-- **Sito ufficiale**: link a **[ciaoim.tech/projects/ami](https://ciaoim.tech/projects/ami)** nel footer della dashboard e in **Informazioni** dal tray (`app.website` in `config.json`).
-- **Stelle GitHub**: contatore **aggiornato** sul dashboard, refresh all’apertura e ogni ~10 minuti; link al repo e scorciatoia **Star** (apre GitHub — la star vera si conferma dal pulsante sul sito, se sei loggato).
-- **README** aggiornato con versione **3.1.4** e riferimento al codice in **`3.0/`**.
+- **Windows:** `AMI-v3.1.4-windows.zip`
+- **macOS:** `AMI-v3.1.4-macos.zip`
 
-### Aggiornamento
+In allegato anche **`SHA256SUMS.txt`**.
 
-Le config con `website: "ciaoim.tech"` vengono portate all’URL completo della pagina AMI al caricamento.
+---
+
+### Checksum OTA (AMI updater)
+
+SHA256 delle zip (stesso contenuto del file `SHA256SUMS.txt` allegato). L'app usa queste righe per verificare il download.
+
+- `AMI-v3.1.4-macos.zip` → sha256:`007fda8f241d3aec46877186152afbd9ef6ab3f7d1cad79ad54dc3cf6e1efd6b`
+- `AMI-v3.1.4-windows.zip` → sha256:`e4708acca4bd4d3009ba960beb03f75b7f5ac556f3b9ef051bcc5bc4f080650d`
 
 ---
 
 <p align="center">
   <b>AMI — Active Monitor of Internet</b><br/>
-  <a href="https://ciaoim.tech/projects/ami">ciaoim.tech/projects/ami</a>
-  &nbsp;·&nbsp;
   <a href="https://github.com/dgiovannetti/AMI">GitHub</a>
 </p>
 
