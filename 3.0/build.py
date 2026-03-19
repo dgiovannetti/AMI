@@ -227,6 +227,11 @@ def create_package() -> None:
             """AMI su macOS — leggi prima di aprire
 =====================================
 
+Dopo aver estratto lo ZIP dalla pagina Release, nella STESSA cartella dovresti vedere:
+  • AMI.app  (icona applicazione — usa SOLO questa)
+  • questo file LEGGIMI_macOS.txt
+  • config.json, cartella resources, ecc.
+
 1) Avvia SOLO l’applicazione «AMI» (icona AMI.app).
    Puoi trascinare AMI.app in Applicazioni e aprirla da lì.
 

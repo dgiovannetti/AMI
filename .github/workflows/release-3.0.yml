@@ -38,13 +38,16 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
 
       - name: Tag name for ZIP filenames
+        id: reltag
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "AMI_REL_TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
+            TAG="${{ github.event.inputs.tag }}"
           else
-            echo "AMI_REL_TAG=${GITHUB_REF#refs/tags/}" >> "$GITHUB_ENV"
+            TAG="${GITHUB_REF#refs/tags/}"
           fi
+          echo "AMI_REL_TAG=$TAG" >> "$GITHUB_ENV"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-python@v5
         with:
@@ -70,17 +73,22 @@ jobs:
           if (Test-Path $zip) { Remove-Item $zip -Force }
           Compress-Archive -Path "3.0/dist/AMI-Package" -DestinationPath $zip -Force
 
-      - name: Zip AMI-Package (macOS)
+      # Contenuto dello ZIP alla radice: AMI.app subito visibile dopo "Estrai" (non solo sotto AMI-Package/).
+      - name: Zip macOS (AMI.app in root of archive)
         if: runner.os == 'macOS'
         working-directory: ${{ github.workspace }}
         run: |
           test -n "$AMI_REL_TAG" || exit 1
-          cd 3.0/dist && zip -r "AMI-${AMI_REL_TAG}-macos.zip" AMI-Package
+          test -d "3.0/dist/AMI-Package/AMI.app" || { echo "ERROR: AMI.app missing in AMI-Package"; ls -laR 3.0/dist/AMI-Package; exit 1; }
+          OUT="3.0/dist/AMI-${AMI_REL_TAG}-macos.zip"
+          rm -f "$OUT"
+          (cd "3.0/dist/AMI-Package" && zip -r -y "$GITHUB_WORKSPACE/$OUT" .)
+          unzip -l "$OUT" | head -30
 
       - uses: actions/upload-artifact@v4
         with:
           name: ami-release-zip-${{ matrix.slug }}
-          path: 3.0/dist/AMI-${{ env.AMI_REL_TAG }}-${{ matrix.slug }}.zip
+          path: 3.0/dist/AMI-${{ steps.reltag.outputs.tag }}-${{ matrix.slug }}.zip
 
   upload-to-release:
     name: Attach ZIPs to GitHub Release

@@ -22,7 +22,7 @@
 ### Download (this release)
 
 - **Windows:** `AMI-v3.1.4-windows.zip` → extract `AMI-Package/AMI.exe`
-- **macOS:** `AMI-v3.1.4-macos.zip` → extract `AMI-Package/AMI.app` (double-click **AMI.app**; see [MACOS_SECURITY.md](MACOS_SECURITY.md) if Gatekeeper prompts)
+- **macOS:** `AMI-v3.1.4-macos.zip` → extract: **AMI.app** is at the **root** of the archive (alongside `LEGGIMI_macOS.txt`); double-click **AMI.app** ([MACOS_SECURITY.md](MACOS_SECURITY.md) if Gatekeeper prompts)
 
 Also attached: **`SHA256SUMS.txt`** (authoritative hashes; CI may also append a **Checksum OTA** block to the release body).
 
@@ -43,7 +43,7 @@ Also attached: **`SHA256SUMS.txt`** (authoritative hashes; CI may also append a 
 ### Download
 
 - **Windows:** `AMI-v3.1.4-windows.zip` → `AMI-Package/AMI.exe`
-- **macOS:** `AMI-v3.1.4-macos.zip` → `AMI-Package/AMI.app` (bundle firmato ad-hoc in CI; messaggio “Python” in Gatekeeper mitigato rispetto al binario sciolto)
+- **macOS:** `AMI-v3.1.4-macos.zip` → estrai: **`AMI.app`** in evidenza nella cartella (root dello ZIP; non più solo sotto `AMI-Package/`)
 
 In allegato anche **`SHA256SUMS.txt`** (hash aggiornati ogni volta che ricarichi gli ZIP sulla stessa tag).
 

@@ -55,7 +55,7 @@ pip install -r requirements.txt pyinstaller
 python build.py
 ```
 
-Output: `dist/AMI-Package/` — **Windows:** onedir + `AMI.exe`; **macOS:** `AMI.app` bundle + `config.json`, `config.schema.json`, `resources/` (PyInstaller spec `ami_macos.spec`; firma ad-hoc con `codesign` se disponibile, oppure `AMI_CODESIGN_IDENTITY` per Developer ID).
+Output locale: `dist/AMI-Package/` — **Windows:** onedir + `AMI.exe`; **macOS:** `AMI.app` + file di supporto. Lo **ZIP release macOS** su GitHub è costruito con **`AMI.app` in root** (estratti insieme a `LEGGIMI_macOS.txt`, config, resources). Spec `ami_macos.spec`; `codesign` ricorsivo; `AMI_CODESIGN_IDENTITY` opzionale per Developer ID.
 
 ### Windows (da root del repo)
 

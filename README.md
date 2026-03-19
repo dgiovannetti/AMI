@@ -115,8 +115,8 @@ AMI features a **completely redesigned UI** inspired by Stripe, Vercel, and mode
 4. The application will appear in your system tray
 
 #### macOS (AMI 3.x)
-1. Download the latest `AMI-*-macos.zip` from [Releases](https://github.com/dgiovannetti/AMI/releases) (cartella **`AMI-Package`** con **`AMI.app`**).
-2. Estrai lo ZIP dove preferisci.
+1. Download the latest `AMI-*-macos.zip` from [Releases](https://github.com/dgiovannetti/AMI/releases).
+2. Estrai lo ZIP: nella cartella di destinazione trovi subito **`AMI.app`** (alla radice dell’archivio, insieme a `LEGGIMI_macOS.txt` e `config.json`).
 3. **Avvio:** doppio click su **`AMI.app`** (o tasto destro → **Apri** la prima volta).
 4. **Gatekeeper:** senza certificato Apple Developer può comparire un avviso (a volte citava *Python* nelle build vecchie). Usa **Apri** dal menu contestuale oppure **Impostazioni → Privacy e sicurezza → Apri comunque**. Dopo la prima apertura macOS ricorda l’eccezione.
 5. In alternativa da Terminale: `xattr -cr AMI.app && open AMI.app` (dalla cartella `AMI-Package`).

@@ -4,11 +4,11 @@
 
 ### Causa più comune (anche con AMI.app)
 
-Se apri **Mostra contenuto pacchetto** → `Contents` → `MacOS` → file **`AMI`** (icona terminale / eseguibile nudo), macOS tratta quel file come **codice firmato in modo diverso** dall’app e spesso lo etichetta in modo generico (**Python** / motore PyInstaller). **Non usare quel file.** Torna indietro e fai doppio click su **`AMI.app`** (icona applicazione nella cartella `AMI-Package`).
+Se apri **Mostra contenuto pacchetto** → `Contents` → `MacOS` → file **`AMI`** (icona terminale / eseguibile nudo), macOS tratta quel file come **codice firmato in modo diverso** dall’app e spesso lo etichetta in modo generico (**Python** / motore PyInstaller). **Non usare quel file.** Torna indietro e fai doppio click su **`AMI.app`** (icona applicazione nella **cartella in cui hai estratto lo ZIP**).
 
 ### Build attuale
 
-**AMI 3.1.4** si scarica come ZIP il cui nome contiene **`macos`** (es. `AMI-v3.1.4-macos.zip`). Dentro c’è **`AMI-Package/AMI.app`**. L’app ha bundle id `tech.ciaoim.ami` e nome **AMI** in Finder.
+**AMI 3.1.4** si scarica come ZIP il cui nome contiene **`macos`** (es. `AMI-v3.1.4-macos.zip`). Dopo **Estrai**, **`AMI.app`** è **nella cartella che si crea**, in **primo piano** (insieme a `LEGGIMI_macOS.txt`, `config.json`, `resources/`). Non serve cercare una sottocartella `AMI-Package`. L’app ha bundle id `tech.ciaoim.ami` e nome **AMI** in Finder.
 
 **Evita** vecchi file tipo **`AMI-macOS.zip`** sulla stessa pagina Release (nomi senza versione): possono essere pacchetti diversi o obsoleti.
 
@@ -18,13 +18,13 @@ Senza **Developer ID** + **notarizzazione Apple**, Gatekeeper può **comunque** 
 
 Questo messaggio è **normale** per app **non notarizzate**. AMI open source su GitHub non usa un certificato a pagamento Apple, quindi Gatekeeper può mostrare l’avviso per precauzione.
 
-**Nota (3.1.4+):** la distribuzione macOS è il bundle **`AMI.app`** nella cartella **`AMI-Package`** estratta dallo ZIP della release.
+**Nota (3.1.4+):** la distribuzione macOS è il bundle **`AMI.app`** nella **cartella estratta** dallo ZIP release (in primo piano, non nascosto in sottocartelle).
 
 ## ✅ Soluzioni per aprire AMI
 
 ### Metodo 1: Click destro + Apri (Consigliato)
 
-1. Nella cartella **`AMI-Package`**, individua **`AMI.app`** (icona applicazione).
+1. Nella **cartella estratta dallo ZIP**, individua **`AMI.app`** (icona applicazione).
 2. **Click destro** (o Ctrl+click) su **`AMI.app`**
 3. Seleziona **"Apri"** dal menu contestuale
 4. Nel dialog che appare, clicca **"Apri"**
@@ -51,8 +51,8 @@ Questo messaggio è **normale** per app **non notarizzate**. AMI open source su 
 Rimuovi l'attributo di quarantena da AMI:
 
 ```bash
-# Vai nella directory dove hai estratto AMI
-cd /path/to/AMI-Package
+# Vai nella directory dove hai estratto lo ZIP (dove c’è AMI.app)
+cd /path/to/cartella-estratta
 
 # Rimuovi quarantena dal bundle .app
 xattr -cr AMI.app
@@ -171,7 +171,7 @@ Modifica `.github/workflows/build.yml`:
 Questo succede se l'attributo di quarantena è corrotto:
 
 ```bash
-xattr -cr /path/to/AMI-Package/AMI.app
+xattr -cr /path/to/cartella-estratta/AMI.app
 ```
 
 ### "AMI" non può essere aperto perché lo sviluppatore non può essere verificato
