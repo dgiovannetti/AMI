@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QApplication, QSplashScreen
 
 
 class UltraModernSplashScreen(QSplashScreen):
-    def __init__(self, version: str = "3.1.0"):
+    def __init__(self, version: str = "3.1.2"):
         self._version = version
         pixmap = QPixmap(480, 300)
         pixmap.fill(Qt.GlobalColor.transparent)

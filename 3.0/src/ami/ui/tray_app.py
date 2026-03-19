@@ -7,7 +7,7 @@ import sys
 import threading
 from pathlib import Path
 
-from PyQt6.QtCore import QTimer, Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QObject, QTimer, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
@@ -29,6 +29,12 @@ from ami.ui.compact_status import CompactStatusWindow
 from ami.ui.settings_dialog import SettingsDialog
 from ami.ui.splash_screen import UltraModernSplashScreen
 from ami.ui.update_dialog import UpdateDialog
+
+
+class _SpeedTestDoneBridge(QObject):
+    """Emit from background thread; slot runs on GUI thread (QueuedConnection)."""
+
+    finished = pyqtSignal()
 
 
 class MonitorThread(QThread):
@@ -116,6 +122,9 @@ class SystemTrayApp:
             self.compact_status.show()
         self.check_connection()
         self.dashboard = None
+        self._speed_test_busy = False
+        self._speed_test_bridge = _SpeedTestDoneBridge(self.app)
+        self._speed_test_bridge.finished.connect(self._on_speed_test_finished)
         self.speed_test_timer = None
         st_cfg = self.config.get("speed_test", {})
         if st_cfg.get("enabled", False):
@@ -123,7 +132,7 @@ class SystemTrayApp:
             self.speed_test_timer = QTimer()
             self.speed_test_timer.timeout.connect(self._run_speed_test)
             self.speed_test_timer.start(interval_ms)
-            QTimer.singleShot(60000, self._run_speed_test)
+            QTimer.singleShot(15000, self._run_speed_test)
         self._splash_closed = False
         self._splash_closable = False
         QTimer.singleShot(1500, self._allow_splash_close)
@@ -233,6 +242,7 @@ class SystemTrayApp:
         menu.addAction(self.speed_action)
         menu.addSeparator()
         menu.addAction("🔄 Test Now").triggered.connect(self.manual_test)
+        menu.addAction("⚡ Speed test now").triggered.connect(self._speed_test_now)
         menu.addAction("📊 Dashboard").triggered.connect(self.show_dashboard)
         menu.addSeparator()
         menu.addAction("⚙️ Settings").triggered.connect(self.show_settings)
@@ -358,6 +368,28 @@ class SystemTrayApp:
         if self.compact_status:
             self.compact_status.update_status(status)
 
+    def _on_speed_test_finished(self) -> None:
+        self._speed_test_busy = False
+        self.check_connection()
+
+    def _speed_test_now(self) -> None:
+        st_cfg = self.config.get("speed_test", {})
+        if not st_cfg.get("enabled", False):
+            self.tray_icon.showMessage(
+                "AMI",
+                "Speed test is disabled in Settings.",
+                QSystemTrayIcon.MessageIcon.Warning,
+                2500,
+            )
+            return
+        self.tray_icon.showMessage(
+            "AMI",
+            "Running download speed test…",
+            QSystemTrayIcon.MessageIcon.Information,
+            2000,
+        )
+        self._run_speed_test()
+
     def _run_speed_test(self) -> None:
         st_cfg = self.config.get("speed_test", {})
         if not st_cfg.get("enabled", False):
@@ -367,15 +399,23 @@ class SystemTrayApp:
         url = st_cfg.get("test_url", "").strip()
         if not url:
             return
+        if self._speed_test_busy:
+            return
+        self._speed_test_busy = True
         size_mb = float(st_cfg.get("download_size_mb", 10))
+        warmup_mb = float(st_cfg.get("warmup_mb", 2))
         timeout = int(st_cfg.get("timeout_seconds", 30))
         low = float(st_cfg.get("tier_low_mbps", 100))
         high = float(st_cfg.get("tier_high_mbps", 1000))
         monitor = self.monitor
+        bridge = self._speed_test_bridge
 
         def run() -> None:
-            mbps, tier = run_speed_test(url, size_mb, timeout, low, high)
-            monitor.set_speed_result(mbps, tier)
+            try:
+                mbps, tier = run_speed_test(url, size_mb, timeout, low, high, warmup_mb=warmup_mb)
+                monitor.set_speed_result(mbps, tier)
+            finally:
+                bridge.finished.emit()
 
         threading.Thread(target=run, daemon=True).start()
 

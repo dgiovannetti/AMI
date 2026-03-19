@@ -94,6 +94,7 @@
         "interval_minutes": { "type": "integer", "minimum": 1 },
         "test_url": { "type": "string" },
         "download_size_mb": { "type": "number", "minimum": 0.5 },
+        "warmup_mb": { "type": "number", "minimum": 0, "maximum": 20 },
         "timeout_seconds": { "type": "integer", "minimum": 1 },
         "tier_low_mbps": { "type": "number" },
         "tier_high_mbps": { "type": "number" }

@@ -17,7 +17,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "app": {
         "name": "AMI",
         "subtitle": "Active Monitor of Internet",
-        "version": "3.1.0",
+        "version": "3.1.2",
         "copyright": "© 2025 CiaoIM™ by Daniel Giovannetti",
         "website": "ciaoim.tech",
         "tagline": "Crafted logic. Measured force. Front-end vision, compiled systems, and hardcoded ethics.",
@@ -60,8 +60,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "speed_test": {
         "enabled": True,
         "interval_minutes": 30,
-        "test_url": "https://speed.cloudflare.com/__down?bytes=52428800",
+        "test_url": "https://speed.hetzner.de/100MB.bin",
         "download_size_mb": 10,
+        "warmup_mb": 2,
         "timeout_seconds": 30,
         "tier_low_mbps": 100,
         "tier_high_mbps": 1000,
@@ -128,7 +129,7 @@ def _migrate_from_2x(config: Dict[str, Any]) -> Dict[str, Any]:
     except (ValueError, IndexError):
         major = 0
     if major < 3:
-        app["version"] = "3.1.0"
+        app["version"] = "3.1.2"
     mon = out.setdefault("monitoring", {})
     mon.setdefault("http_test_urls", [])
     api = out.setdefault("api", {})
@@ -139,17 +140,23 @@ def _migrate_from_2x(config: Dict[str, Any]) -> Dict[str, Any]:
     st = out.setdefault("speed_test", {
         "enabled": True,
         "interval_minutes": 30,
-        "test_url": "https://speed.cloudflare.com/__down?bytes=52428800",
+        "test_url": "https://speed.hetzner.de/100MB.bin",
         "download_size_mb": 10,
+        "warmup_mb": 2,
         "timeout_seconds": 30,
         "tier_low_mbps": 100,
         "tier_high_mbps": 1000,
     })
-    # Migrate from slow default (proof.ovh) to Cloudflare for accurate high-speed measurement
+    st.setdefault("warmup_mb", 2)
+    # Old 50 MB Cloudflare URL may be too small for max warmup (20) + download (50)
+    if st.get("test_url") == "https://speed.cloudflare.com/__down?bytes=52428800":
+        st["test_url"] = "https://speed.hetzner.de/100MB.bin"
+    # Old proof.ovh default → Hetzner (reliable); AMI still tries fallbacks if primary fails
     if "proof.ovh" in str(st.get("test_url", "")):
-        st["test_url"] = "https://speed.cloudflare.com/__down?bytes=52428800"
+        st["test_url"] = "https://speed.hetzner.de/100MB.bin"
         st["download_size_mb"] = 10
         st["timeout_seconds"] = 30
+        st.setdefault("warmup_mb", 2)
     return out
 
 

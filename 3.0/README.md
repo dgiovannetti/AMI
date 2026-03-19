@@ -45,6 +45,7 @@ Key options:
 - `api.enabled`, `api.port`, `api.auth_token` (optional)
 - `ui.theme` (`auto` | `light` | `dark`), `show_dashboard_on_start`, `compact_status_window`
 - `updates.enabled`, `check_on_startup`, `check_interval_hours`, `github_repo`, `max_postponements`
+- `speed_test` (enabled, interval, `test_url`, `download_size_mb`, `warmup_mb`, `timeout_seconds`, tier Mbps thresholds): timed window after optional warmup; `test_url` should serve at least **warmup + download** bytes. If the primary URL fails (e.g. HTTP 403), AMI tries built-in fallback mirrors automatically.
 
 ## Build
 
