@@ -45,7 +45,7 @@
   "ui": {
     "theme": "auto",
     "show_dashboard_on_start": false,
-    "compact_status_window": true
+    "compact_status_window": false
   },
   "updates": {
     "enabled": true,

@@ -47,7 +47,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "ui": {
         "theme": "auto",
         "show_dashboard_on_start": False,
-        "compact_status_window": True,
+        "compact_status_window": False,
     },
     "updates": {
         "enabled": True,

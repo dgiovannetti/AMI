@@ -124,7 +124,7 @@ app = BUNDLE(
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "10.14",
         "NSHumanReadableCopyright": "Copyright © 2025–2026 CiaoIM™",
-        # Tray + dashboard: show in Dock when windows are used
+        # Icona Dock: punto di recupero se il tray è nascosto; menu bar resta principale
         "LSUIElement": False,
     },
 )

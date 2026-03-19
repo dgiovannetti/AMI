@@ -231,7 +231,7 @@ class SettingsDialog(QDialog):
         self.show_dash.setChecked(bool(ui_cfg.get("show_dashboard_on_start", False)))
         form.addRow("", self.show_dash)
         self.compact_status = QCheckBox("Compact status window (Dock fallback)")
-        self.compact_status.setChecked(bool(ui_cfg.get("compact_status_window", True)))
+        self.compact_status.setChecked(bool(ui_cfg.get("compact_status_window", False)))
         form.addRow("", self.compact_status)
         self.tabs.addTab(tab, "UI")
 

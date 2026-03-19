@@ -3,7 +3,7 @@ AMI 3.0 — Compact status window (Dock fallback): minimal chrome, no nested fra
 """
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QFont, QIcon
+from PyQt6.QtGui import QColor, QFont, QIcon, QCloseEvent
 from PyQt6.QtWidgets import (
     QFrame,
     QGraphicsDropShadowEffect,
@@ -143,3 +143,8 @@ class CompactStatusWindow(QFrame):
         if self.tray_icon and self.tray_icon.contextMenu():
             menu = self.tray_icon.contextMenu()
             menu.exec(self.menu_btn.mapToGlobal(self.menu_btn.rect().bottomLeft()))
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        """Non distruggere: nascondi così si può riaprire da menu tray o Dock."""
+        event.ignore()
+        self.hide()

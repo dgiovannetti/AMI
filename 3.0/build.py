@@ -258,6 +258,11 @@ Dopo aver estratto lo ZIP dalla pagina Release, nella STESSA cartella dovresti v
   • questo file LEGGIMI_macOS.txt
   • config.json, cartella resources, ecc.
 
+Icona nella barra dei menu in alto: forma scura (● / anello / ✕) che si adatta al tema; se non la vedi, controlla «>>» a destra nella menu bar.
+C’è anche l’icona AMI nel Dock: clic per riaprire menu / dashboard se hai chiuso le finestre.
+Click sinistro sull’icona in menu bar apre il menu; doppio click apre la dashboard.
+Il primo avvio dal .app è più lento che `python -m ami.main` (PyInstaller carica librerie).
+
 1) Avvia SOLO l’applicazione «AMI» (icona AMI.app).
    Puoi trascinare AMI.app in Applicazioni e aprirla da lì.
 
