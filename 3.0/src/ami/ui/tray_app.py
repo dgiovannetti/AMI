@@ -41,6 +41,25 @@ def _tray_debug(msg: str) -> None:
         print(f"[AMI tray] {msg}", file=sys.stderr, flush=True)
 
 
+def _apply_macos_dock_application_icon(app: QApplication) -> None:
+    """
+    Dock e App Switcher su macOS: senza bundle .app, il processo è «python» e l’icona è quella di Python.
+    Impostare l’icona sull’applicazione Qt la sostituisce con il brand AMI (come l’.icns nel BUNDLE).
+    """
+    res = get_base_path() / "resources"
+    # PNG prima: QIcon legge sempre bene; .icns dipende dai plugin Qt.
+    for name in ("ami.png", "ami.icns"):
+        p = res / name
+        if not p.is_file():
+            continue
+        ic = QIcon(str(p))
+        if ic.isNull():
+            continue
+        app.setWindowIcon(ic)
+        _tray_debug(f"macOS Dock: setWindowIcon from resources/{name}")
+        return
+
+
 def _effective_compact_status_window(config: dict) -> bool:
     """Default: off — menu bar + Dock; compact window only if explicitly enabled."""
     v = config.get("ui", {}).get("compact_status_window")
@@ -79,6 +98,8 @@ class SystemTrayApp:
         except (AttributeError, TypeError):
             pass
         self.app = QApplication(sys.argv)
+        if sys.platform == "darwin":
+            _apply_macos_dock_application_icon(self.app)
         self.app.setQuitOnLastWindowClosed(False)
         # Non collegare applicationStateChanged qui: durante __init__ processEvents() può
         # emettere ApplicationActive; aprire finestre da quello stack su macOS → qFatal/SIGABRT (Qt 6 + Cocoa).
