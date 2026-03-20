@@ -691,11 +691,8 @@ class SystemTrayApp:
             else:
                 self.show_dashboard()
             return
-        # macOS: click sinistro sul tray apre il menu (scopribilità se l’icona è piccola).
-        if sys.platform == "darwin" and reason == QSystemTrayIcon.ActivationReason.Trigger:
-            m = self._tray_menu
-            if m:
-                m.popup(QCursor.pos())
+        # macOS: non chiamare popup() qui — `setContextMenu` fa già aprire il menu al click;
+        # un secondo popup su Trigger causava due menu sovrapposti.
 
     def show_dashboard(self) -> None:
         if self.dashboard is None:
