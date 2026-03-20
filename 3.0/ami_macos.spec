@@ -13,6 +13,7 @@ _sp = SPECPATH
 ROOT = Path(_sp[0] if isinstance(_sp, (list, tuple)) else _sp)
 SRC = ROOT / "src"
 RES = ROOT / "resources"
+ICNS = RES / "ami.icns"
 MAIN = SRC / "ami" / "main.py"
 CFG = ROOT / "config.json"
 SCHEMA = ROOT / "config.schema.json"
@@ -78,6 +79,22 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+_info_plist = {
+    "CFBundleName": "AMI",
+    "CFBundleDisplayName": "AMI — Active Monitor of Internet",
+    "CFBundleIdentifier": "tech.ciaoim.ami",
+    "CFBundleVersion": AMI_VERSION,
+    "CFBundleShortVersionString": AMI_VERSION,
+    "CFBundlePackageType": "APPL",
+    "NSHighResolutionCapable": True,
+    "LSMinimumSystemVersion": "10.14",
+    "NSHumanReadableCopyright": "Copyright © 2025–2026 CiaoIM™",
+    "LSUIElement": False,
+}
+if ICNS.is_file():
+    # Allineato al file copiato in Resources come ami.icns (senza estensione in plist)
+    _info_plist["CFBundleIconFile"] = "ami"
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -112,19 +129,7 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name="AMI.app",
-    icon=None,
+    icon=str(ICNS) if ICNS.is_file() else None,
     bundle_identifier="tech.ciaoim.ami",
-    info_plist={
-        "CFBundleName": "AMI",
-        "CFBundleDisplayName": "AMI — Active Monitor of Internet",
-        "CFBundleIdentifier": "tech.ciaoim.ami",
-        "CFBundleVersion": AMI_VERSION,
-        "CFBundleShortVersionString": AMI_VERSION,
-        "CFBundlePackageType": "APPL",
-        "NSHighResolutionCapable": True,
-        "LSMinimumSystemVersion": "10.14",
-        "NSHumanReadableCopyright": "Copyright © 2025–2026 CiaoIM™",
-        # Icona Dock: punto di recupero se il tray è nascosto; menu bar resta principale
-        "LSUIElement": False,
-    },
+    info_plist=_info_plist,
 )
