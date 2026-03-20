@@ -13,9 +13,19 @@ def get_base_path() -> Path:
     """
     Base path for application resources.
     PyInstaller: sys._MEIPASS. Development: 3.0/ (parent of src/ami).
+
+    macOS .app: PyInstaller usa ``Contents/Frameworks`` come ``_MEIPASS``, ma i ``datas``
+    (config, ``resources/*.png``, …) stanno spesso in ``Contents/Resources`` — vedi PyInstaller #7884.
+    Senza questo accorgimento le icone tray e le PNG in bundle non si trovano.
     """
     if getattr(sys, "frozen", False):
-        return Path(sys._MEIPASS)
+        me = Path(getattr(sys, "_MEIPASS", "")).resolve()
+        if sys.platform == "darwin":
+            # Bundle .app: cartella sorella "Resources" contiene ``resources/`` e copie di config.
+            alt = me.parent / "Resources"
+            if (alt / "resources").is_dir():
+                return alt
+        return me
     # __file__ = …/src/ami/core/paths.py → cartella progetto 3.0/ è parents[3] (non parents[2]=src/)
     return Path(__file__).resolve().parents[3]
 

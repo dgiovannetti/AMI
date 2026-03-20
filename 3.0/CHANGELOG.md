@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **macOS .app (PyInstaller) — risorse e tray**: con bundle ``AMI.app``, ``sys._MEIPASS`` punta a ``Contents/Frameworks`` mentre PNG e ``resources/`` sono sotto ``Contents/Resources``. ``get_base_path()`` in frozen ora preferisce ``Resources`` se esiste ``Resources/resources/``, così **status_*.png**, logo e config bundled sono risolti correttamente (icona menu bar come da sorgente).
 - **Fix `get_base_path()` in sviluppo**: con layout `3.0/src/ami/core/paths.py` il livello progetto è **`parents[3]`** (cartella `3.0/`), non `parents[2]` (che puntava a `src/`). Senza questo, `resources/status_*.png`, `config.json` e altri file bundled risultavano **assenti** in `python -m ami.main` / `PYTHONPATH=src`.
 - **macOS crash SIGABRT all’avvio (.app)**: `applicationStateChanged` collegato troppo presto + `processEvents()` in `__init__` causavano **riapertura finestre nello stack** di `QGuiApplicationPrivate::setApplicationState` → `QMessageLogger::fatal` / abort. Fix: connessione del segnale **solo a fine** `__init__` e gestione **differita** con `QTimer.singleShot(0, …)`.
 - **macOS menu bar tray — icone previste**: di nuovo **PNG a colori** ufficiali (`status_green|yellow|red.png`, ✓ / ! / ✕) con più tagli **1x e @2x** (`devicePixelRatio`). La maschera template resta solo con **`AMI_TRAY_TEMPLATE=1`** se servisse un fallback. Raster 512 solo se manca il file.
