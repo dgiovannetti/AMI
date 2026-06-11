@@ -6,6 +6,7 @@ import html
 import os
 import sys
 import threading
+import time
 from pathlib import Path
 
 from PyQt6.QtCore import QObject, QTimer, Qt, QThread, pyqtSignal
@@ -41,13 +42,22 @@ def _tray_debug(msg: str) -> None:
         print(f"[AMI tray] {msg}", file=sys.stderr, flush=True)
 
 
-def _apply_macos_dock_application_icon(app: QApplication) -> None:
+def _apply_macos_dock_presence(app: QApplication) -> None:
     """
-    Dock e App Switcher su macOS: senza bundle .app, il processo è «python» e l’icona è quella di Python.
-    Impostare l’icona sull’applicazione Qt la sostituisce con il brand AMI (come l’.icns nel BUNDLE).
+    Dock su macOS: app solo tray + splash → senza policy Regular l’icona Dock sparisce
+    appena chiude lo splash (macOS tratta il processo come accessory/agent).
+    Da sorgente imposta anche setWindowIcon (al posto dell’icona Python).
     """
+    try:
+        from AppKit import NSApplication, NSApplicationActivationPolicyRegular
+
+        ns = NSApplication.sharedApplication()
+        ns.setActivationPolicy_(NSApplicationActivationPolicyRegular)
+        _tray_debug("macOS Dock: NSApplicationActivationPolicyRegular")
+    except Exception as exc:
+        _tray_debug(f"macOS Dock policy skipped: {exc}")
+
     res = get_base_path() / "resources"
-    # PNG prima: QIcon legge sempre bene; .icns dipende dai plugin Qt.
     for name in ("ami.png", "ami.icns"):
         p = res / name
         if not p.is_file():
@@ -99,8 +109,10 @@ class SystemTrayApp:
             pass
         self.app = QApplication(sys.argv)
         if sys.platform == "darwin":
-            _apply_macos_dock_application_icon(self.app)
+            _apply_macos_dock_presence(self.app)
         self.app.setQuitOnLastWindowClosed(False)
+        # Evita che il click Dock riapra la dashboard subito dopo splash/avvio.
+        self._dock_resume_blocked_until = time.monotonic() + 8.0
         # Non collegare applicationStateChanged qui: durante __init__ processEvents() può
         # emettere ApplicationActive; aprire finestre da quello stack su macOS → qFatal/SIGABRT (Qt 6 + Cocoa).
         self._startup_complete = False
@@ -256,6 +268,8 @@ class SystemTrayApp:
 
     def _deferred_application_active_from_dock(self) -> None:
         if not getattr(self, "_startup_complete", False):
+            return
+        if time.monotonic() < getattr(self, "_dock_resume_blocked_until", 0):
             return
         if self.app.applicationState() != Qt.ApplicationState.ApplicationActive:
             return
