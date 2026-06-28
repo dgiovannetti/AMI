@@ -42,6 +42,16 @@ def _tray_debug(msg: str) -> None:
         print(f"[AMI tray] {msg}", file=sys.stderr, flush=True)
 
 
+def _log_ami_quit() -> None:
+    try:
+        from datetime import datetime, timezone
+
+        with open("/tmp/ami-quit.log", "a", encoding="utf-8") as f:
+            f.write(f"{datetime.now(timezone.utc).isoformat()} aboutToQuit\n")
+    except OSError:
+        pass
+
+
 def _apply_macos_dock_presence(app: QApplication) -> None:
     """
     Dock su macOS: app solo tray + splash → senza policy Regular l’icona Dock sparisce
@@ -119,6 +129,7 @@ class SystemTrayApp:
         except (AttributeError, TypeError):
             pass
         self.app = QApplication(sys.argv)
+        self.app.aboutToQuit.connect(_log_ami_quit)
         if sys.platform == "darwin":
             _apply_macos_dock_presence(self.app)
         self.app.setQuitOnLastWindowClosed(False)
@@ -180,6 +191,10 @@ class SystemTrayApp:
         if sys.platform == "darwin":
             for ms in (50, 150, 400, 1000, 2500):
                 QTimer.singleShot(ms, self._reassert_macos_tray)
+            if self._native_macos_tray:
+                self._tray_heartbeat = QTimer()
+                self._tray_heartbeat.timeout.connect(self._heartbeat_macos_tray)
+                self._tray_heartbeat.start(10000)
         if sys.platform == "darwin" and not self._native_macos_tray and not QSystemTrayIcon.isSystemTrayAvailable():
             QMessageBox.warning(
                 None,
@@ -561,17 +576,27 @@ class SystemTrayApp:
 
     def _reassert_macos_tray(self) -> None:
         try:
+            if getattr(self, "_native_macos_tray", False) and hasattr(self.tray_icon, "reassert"):
+                self.tray_icon.reassert()
             st = getattr(self, "current_status", None)
             key = st.status if st and getattr(st, "status", None) else "offline"
             self._apply_tray_icon_for_status(key)
-            self.tray_icon.setVisible(True)
-            self.tray_icon.show()
+            if not getattr(self, "_native_macos_tray", False):
+                self.tray_icon.setVisible(True)
+                self.tray_icon.show()
             self.app.processEvents()
             g = self.tray_icon.geometry()
             _tray_debug(
                 f"reassert status={key} icon_null={self.tray_icon.icon().isNull()} "
                 f"geometry={g.x()},{g.y()},{g.width()}x{g.height()}"
             )
+        except Exception:
+            pass
+
+    def _heartbeat_macos_tray(self) -> None:
+        try:
+            if hasattr(self.tray_icon, "reassert"):
+                self.tray_icon.reassert()
         except Exception:
             pass
 

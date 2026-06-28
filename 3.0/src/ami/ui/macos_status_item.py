@@ -25,9 +25,10 @@ def macos_reassert_regular_activation_policy() -> None:
     try:
         from AppKit import NSApplication, NSApplicationActivationPolicyRegular
 
-        NSApplication.sharedApplication().setActivationPolicy_(
-            NSApplicationActivationPolicyRegular
-        )
+        ns = NSApplication.sharedApplication()
+        ns.setActivationPolicy_(NSApplicationActivationPolicyRegular)
+        if hasattr(ns, "finishLaunching"):
+            ns.finishLaunching()
     except Exception:
         pass
 
@@ -81,6 +82,11 @@ class MacOSTrayIcon(QObject):
             raise RuntimeError("NSStatusItem.button() is None")
         btn.setTarget_(self._click_target)
         btn.setAction_("handleClick:")
+        # 0 = niente rimozione utente / niente quit se macOS toglie l'icona (flag 4 = TerminationOnRemoval)
+        try:
+            self._status_item.setBehavior_(0)
+        except (AttributeError, TypeError):
+            pass
         macos_reassert_regular_activation_policy()
         self._status_item.setVisible_(True)
         self._visible = True
@@ -129,14 +135,12 @@ class MacOSTrayIcon(QObject):
         self._last_icon_path = fp
         btn = self._status_item.button()
         btn.setImage_(self._ns_image)
-        # Fallback testo se l'immagine non si vede (menu bar stretta / Retina)
-        sym = {
-            "status_green.png": "✓",
-            "status_yellow.png": "!",
-            "status_red.png": "✕",
-        }.get(Path(fp).name, "●")
-        btn.setTitle_(sym)
+        btn.setTitle_("")
         btn.setHidden_(False)
+        try:
+            self._status_item.setBehavior_(0)
+        except (AttributeError, TypeError):
+            pass
         self._status_item.setVisible_(True)
         self._icon = QIcon(fp)
         _tray_debug(f"native tray: image from {Path(fp).name}")
@@ -173,12 +177,28 @@ class MacOSTrayIcon(QObject):
         self._context_menu = menu
 
     def show(self) -> None:
+        self.reassert()
+
+    def reassert(self) -> None:
+        """Mantiene visibile l'icona menu bar (macOS può rimuoverla / Qt cambia policy)."""
         macos_reassert_regular_activation_policy()
+        try:
+            self._status_item.setBehavior_(0)
+        except (AttributeError, TypeError):
+            pass
         self._visible = True
         self._status_item.setVisible_(True)
         btn = self._status_item.button()
         if btn is not None:
             btn.setHidden_(False)
+            if self._ns_image is not None and btn.image() is None:
+                btn.setImage_(self._ns_image)
+        if self._last_icon_path and Path(self._last_icon_path).is_file():
+            cur = btn.image() if btn is not None else None
+            if cur is None:
+                saved = self._last_icon_path
+                self._last_icon_path = None
+                self.set_icon_from_path(saved)
 
     def hide(self) -> None:
         self._visible = False
