@@ -151,8 +151,15 @@ class SystemTrayApp:
             self.update_timer.timeout.connect(lambda: self.check_for_updates(False))
             self.update_timer.start(check_interval * 3600 * 1000)
 
-        # Tray: su macOS il primo show sincrono in __init__ può dare geometry altezza 0 (invisibile).
-        self.tray_icon = QSystemTrayIcon(self.app)
+        # Tray: su macOS NSStatusItem nativo (PNG a colori); Qt spesso invisibile in menu bar.
+        if sys.platform == "darwin":
+            from ami.ui.macos_status_item import create_macos_tray_icon
+
+            self.tray_icon = create_macos_tray_icon(self.app)
+            self._native_macos_tray = hasattr(self.tray_icon, "set_icon_from_path")
+        else:
+            self.tray_icon = QSystemTrayIcon(self.app)
+            self._native_macos_tray = False
         self._apply_tray_icon_for_status("offline")
         self.tray_icon.setToolTip("AMI - Starting...")
         self.create_menu()
@@ -169,7 +176,7 @@ class SystemTrayApp:
         if sys.platform == "darwin":
             for ms in (50, 150, 400, 1000, 2500):
                 QTimer.singleShot(ms, self._reassert_macos_tray)
-        if sys.platform == "darwin" and not QSystemTrayIcon.isSystemTrayAvailable():
+        if sys.platform == "darwin" and not self._native_macos_tray and not QSystemTrayIcon.isSystemTrayAvailable():
             QMessageBox.warning(
                 None,
                 "AMI",
@@ -415,11 +422,14 @@ class SystemTrayApp:
         self.tray_icon.setContextMenu(menu)
 
     def _apply_tray_icon_for_status(self, status: str) -> None:
-        """Icona tray prima dell’init pesante (menu bar macOS)."""
+        """Icona tray (menu bar): PNG ufficiali status_green|yellow|red."""
         path = get_base_path() / "resources" / {
             "online": "status_green.png",
             "unstable": "status_yellow.png",
         }.get(status, "status_red.png")
+        if getattr(self, "_native_macos_tray", False) and path.is_file():
+            self.tray_icon.set_icon_from_path(path)
+            return
         self.tray_icon.setIcon(self._resolve_tray_icon(path, status))
 
     def _resolve_tray_icon(self, path: Path, status: str) -> QIcon:
@@ -592,8 +602,7 @@ class SystemTrayApp:
         return QIcon(pixmap)
 
     def update_icon(self, status: str) -> None:
-        path = get_base_path() / "resources" / {"online": "status_green.png", "unstable": "status_yellow.png"}.get(status, "status_red.png")
-        self.tray_icon.setIcon(self._resolve_tray_icon(path, status))
+        self._apply_tray_icon_for_status(status)
 
     def update_tooltip(self, status) -> None:
         parts = ["AMI - Active Monitor of Internet", f"{'🟢' if status.status == 'online' else '🟡' if status.status == 'unstable' else '🔴'} {status.status.upper()}"]

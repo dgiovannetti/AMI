@@ -55,6 +55,7 @@ a = Analysis(
         "ami.services.speed_test",
         "ami.ui",
         "ami.ui.tray_app",
+        "ami.ui.macos_status_item",
         "ami.ui.dashboard",
         "ami.ui.splash_screen",
         "ami.ui.settings_dialog",

@@ -11,3 +11,4 @@ numpy>=1.26.2
 packaging>=23.2
 platformdirs>=4.0.0
 jsonschema>=4.20.0
+pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"
