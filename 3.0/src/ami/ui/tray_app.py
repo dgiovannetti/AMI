@@ -78,6 +78,17 @@ def _effective_compact_status_window(config: dict) -> bool:
     return bool(v)
 
 
+def _effective_app_version(config: dict) -> str:
+    """Versione per OTA/splash: mai inferiore al codice in esecuzione (`ami.__version__`)."""
+    cfg_v = config.get("app", {}).get("version", __version__)
+    try:
+        from packaging.version import InvalidVersion, parse as vparse
+
+        return str(max(vparse(cfg_v), vparse(__version__)))
+    except InvalidVersion:
+        return __version__
+
+
 class _SpeedTestDoneBridge(QObject):
     """Emit from background thread; slot runs on GUI thread (QueuedConnection)."""
 
@@ -117,7 +128,7 @@ class SystemTrayApp:
         # emettere ApplicationActive; aprire finestre da quello stack su macOS → qFatal/SIGABRT (Qt 6 + Cocoa).
         self._startup_complete = False
         self.config = self.load_config()
-        app_version = self.config.get("app", {}).get("version", __version__)
+        app_version = _effective_app_version(self.config)
         use_compact = _effective_compact_status_window(self.config)
         # Cache icone tray macOS (template da PNG per path)
         self._macos_tray_icon_cache: dict[str, QIcon] = {}

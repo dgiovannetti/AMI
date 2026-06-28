@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- **macOS Dock / Finder**: `AMI.app` usa **`resources/ami.icns`** (generato da `ami.png` con `scripts/generate_ami_icns.sh`) nel `BUNDLE` PyInstaller — icona applicazione nel Dock e in Finder. L’icona **menu bar** resta le PNG `status_*.png` (tray), non il `.icns`.
+- **Avvio locale / config**: migrazione 2.x→3.x **salvata su disco** al load (prima restava `2.0.0` nel file utente). OTA usa la versione **≥ `ami.__version__`**. Script **`3.0/run_local.sh`** (riavvio affidabile; `pkill || true` se non c’era già un’istanza).
+- **macOS Dock / Finder**: `AMI.app` usa **`resources/ami.icns`** nel BUNDLE PyInstaller. Menu bar = PNG `status_*.png`.
 - **macOS Dock da sorgente** (`python -m ami.main`): **`NSApplicationActivationPolicyRegular`** + `setWindowIcon` (`ami.png` / `ami.icns`) — senza policy Regular l’icona Dock **sparisce** dopo lo splash (app solo menu bar). Grace period 8 s prima di riaprire dashboard al click Dock.
 - **macOS .app (PyInstaller) — risorse e tray**: con bundle ``AMI.app``, ``sys._MEIPASS`` punta a ``Contents/Frameworks`` mentre PNG e ``resources/`` sono sotto ``Contents/Resources``. ``get_base_path()`` in frozen ora preferisce ``Resources`` se esiste ``Resources/resources/``, così **status_*.png**, logo e config bundled sono risolti correttamente (icona menu bar come da sorgente).
 - **Fix `get_base_path()` in sviluppo**: con layout `3.0/src/ami/core/paths.py` il livello progetto è **`parents[3]`** (cartella `3.0/`), non `parents[2]` (che puntava a `src/`). Senza questo, `resources/status_*.png`, `config.json` e altri file bundled risultavano **assenti** in `python -m ami.main` / `PYTHONPATH=src`.

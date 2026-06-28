@@ -187,12 +187,18 @@ def load_config() -> Dict[str, Any]:
 
     try:
         with open(path, "r", encoding="utf-8") as f:
-            config = json.load(f)
+            raw = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         raise RuntimeError(f"Failed to load config from {path}: {e}") from e
 
-    config = _migrate_from_2x(config)
+    config = _migrate_from_2x(raw)
     _validate_config(config)
+    # Salva migrazioni (es. app.version 2.x → 3.1.4) così OTA/About non restano obsoleti.
+    try:
+        if json.dumps(raw, sort_keys=True) != json.dumps(config, sort_keys=True):
+            save_config(config)
+    except Exception:
+        pass
     return config
 
 
