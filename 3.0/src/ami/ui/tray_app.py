@@ -153,10 +153,12 @@ class SystemTrayApp:
 
         # Tray: su macOS NSStatusItem nativo (PNG a colori); Qt spesso invisibile in menu bar.
         if sys.platform == "darwin":
-            from ami.ui.macos_status_item import create_macos_tray_icon
+            from ami.ui.macos_status_item import create_macos_tray_icon, macos_reassert_regular_activation_policy
 
             self.tray_icon = create_macos_tray_icon(self.app)
             self._native_macos_tray = hasattr(self.tray_icon, "set_icon_from_path")
+            if self._native_macos_tray:
+                macos_reassert_regular_activation_policy()
         else:
             self.tray_icon = QSystemTrayIcon(self.app)
             self._native_macos_tray = False
@@ -164,7 +166,9 @@ class SystemTrayApp:
         self.tray_icon.setToolTip("AMI - Starting...")
         self.create_menu()
         self.tray_icon.activated.connect(self.on_tray_activated)
-        if sys.platform == "darwin":
+        if self._native_macos_tray:
+            self.tray_icon.show()
+        elif sys.platform == "darwin":
             QTimer.singleShot(0, self._first_show_macos_tray)
         else:
             self.tray_icon.show()

@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
-from PyQt6.QtGui import QCursor, QIcon
+from PyQt6.QtGui import QCursor, QIcon, QImage
 from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 
@@ -18,6 +18,18 @@ def _tray_debug(msg: str) -> None:
 
     if os.environ.get("AMI_DEBUG_TRAY", "").strip() in ("1", "true", "yes"):
         print(f"[AMI tray] {msg}", file=sys.stderr, flush=True)
+
+
+def macos_reassert_regular_activation_policy() -> None:
+    """Qt può ripristinare Accessory dopo init tray — forza di nuovo Regular."""
+    try:
+        from AppKit import NSApplication, NSApplicationActivationPolicyRegular
+
+        NSApplication.sharedApplication().setActivationPolicy_(
+            NSApplicationActivationPolicyRegular
+        )
+    except Exception:
+        pass
 
 
 if sys.platform == "darwin":
@@ -54,35 +66,77 @@ class MacOSTrayIcon(QObject):
         self._icon = QIcon()
         self._visible = False
         self._tooltip = ""
+        self._last_icon_path: str | None = None
+        self._ns_image = None  # retain forte — altrimenti GC rimuove l'icona dal pulsante
         self._click_target = _MacTrayClickTarget.alloc().initWithOwner_(self)
         self._status_item = NSStatusBar.systemStatusBar().statusItemWithLength_(
             NSVariableStatusItemLength
         )
+        try:
+            self._status_item.setAutosaveName_("tech.ciaoim.ami.status")
+        except (AttributeError, TypeError):
+            pass
         btn = self._status_item.button()
+        if btn is None:
+            raise RuntimeError("NSStatusItem.button() is None")
         btn.setTarget_(self._click_target)
         btn.setAction_("handleClick:")
-        self._message_tray = QSystemTrayIcon(self._app)
+        macos_reassert_regular_activation_policy()
+        self._status_item.setVisible_(True)
+        self._visible = True
 
     def _on_status_click(self) -> None:
         self.activated.emit(QSystemTrayIcon.ActivationReason.Trigger)
         if self._context_menu is not None:
             QTimer.singleShot(0, lambda: self._context_menu.popup(QCursor.pos()))
 
+    def _load_nsimage_from_path(self, fp: str) -> object | None:
+        """PNG → NSImage 18pt (@2x pixel) per menu bar Retina."""
+        qimg = QImage(fp)
+        if qimg.isNull():
+            return None
+        # 36 px = 18pt @2x (standard menu bar)
+        from PyQt6.QtCore import Qt
+
+        scaled = qimg.scaled(
+            36,
+            36,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        from PyQt6.QtCore import QBuffer, QIODevice
+
+        buf = QBuffer()
+        buf.open(QIODevice.OpenModeFlag.WriteOnly)
+        scaled.save(buf, b"PNG")
+        data = bytes(buf.data())
+        img = NSImage.alloc().initWithData_(data)
+        if img is None:
+            return None
+        img.setTemplate_(False)
+        img.setSize_((18.0, 18.0))
+        return img
+
     def set_icon_from_path(self, path: Path | str) -> None:
-        fp = str(path)
-        img = NSImage.alloc().initWithContentsOfFile_(fp)
+        fp = str(path.resolve())
+        if fp == self._last_icon_path and self._ns_image is not None:
+            return
+        img = self._load_nsimage_from_path(fp)
         if img is None:
             _tray_debug(f"native tray: NSImage failed for {fp}")
             return
-        img.setTemplate_(False)
-        img.setSize_((18.0, 18.0))
-        self._status_item.button().setImage_(img)
+        self._ns_image = img
+        self._last_icon_path = fp
+        btn = self._status_item.button()
+        btn.setImage_(self._ns_image)
+        btn.setHidden_(False)
+        self._status_item.setVisible_(True)
         self._icon = QIcon(fp)
         _tray_debug(f"native tray: image from {Path(fp).name}")
 
     def setIcon(self, icon: QIcon) -> None:
         self._icon = icon
-        pm = icon.pixmap(22, 22)
+        pm = icon.pixmap(36, 36)
         if pm.isNull():
             return
         from PyQt6.QtCore import QBuffer, QIODevice
@@ -95,21 +149,29 @@ class MacOSTrayIcon(QObject):
         if img is not None:
             img.setTemplate_(False)
             img.setSize_((18.0, 18.0))
-            self._status_item.button().setImage_(img)
+            self._ns_image = img
+            self._last_icon_path = None
+            self._status_item.button().setImage_(self._ns_image)
 
     def icon(self) -> QIcon:
         return self._icon
 
     def setToolTip(self, tip: str) -> None:
         self._tooltip = tip
-        self._status_item.button().setToolTip_(tip)
+        btn = self._status_item.button()
+        if btn is not None:
+            btn.setToolTip_(tip)
 
     def setContextMenu(self, menu: QMenu | None) -> None:
         self._context_menu = menu
 
     def show(self) -> None:
+        macos_reassert_regular_activation_policy()
         self._visible = True
         self._status_item.setVisible_(True)
+        btn = self._status_item.button()
+        if btn is not None:
+            btn.setHidden_(False)
 
     def hide(self) -> None:
         self._visible = False
@@ -131,14 +193,12 @@ class MacOSTrayIcon(QObject):
         icon: QSystemTrayIcon.MessageIcon = QSystemTrayIcon.MessageIcon.Information,
         timeout_ms: int = 10000,
     ) -> None:
-        self._message_tray.showMessage(title, message, icon, timeout_ms)
+        # Nessun QSystemTrayIcon permanente: su macOS crea un secondo slot menu bar vuoto.
+        _tray_debug(f"native tray message: {title}: {message}")
 
     def geometry(self):
         from PyQt6.QtCore import QRect
 
-        btn = self._status_item.button()
-        if btn is None:
-            return QRect(0, 0, 22, 22)
         return QRect(0, 0, 22, 22)
 
 
