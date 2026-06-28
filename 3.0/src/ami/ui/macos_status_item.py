@@ -129,6 +129,13 @@ class MacOSTrayIcon(QObject):
         self._last_icon_path = fp
         btn = self._status_item.button()
         btn.setImage_(self._ns_image)
+        # Fallback testo se l'immagine non si vede (menu bar stretta / Retina)
+        sym = {
+            "status_green.png": "✓",
+            "status_yellow.png": "!",
+            "status_red.png": "✕",
+        }.get(Path(fp).name, "●")
+        btn.setTitle_(sym)
         btn.setHidden_(False)
         self._status_item.setVisible_(True)
         self._icon = QIcon(fp)
