@@ -42,10 +42,14 @@ def _launch_arguments() -> list[str] | None:
 
 
 def _launch_environment() -> dict[str, str]:
-    if getattr(sys, "frozen", False):
-        return {}
-    src_dir = Path(__file__).resolve().parents[2]
-    return {"PYTHONPATH": str(src_dir)}
+    env: dict[str, str] = {"PYTHONUNBUFFERED": "1"}
+    if not getattr(sys, "frozen", False):
+        src_dir = Path(__file__).resolve().parents[2]
+        env["PYTHONPATH"] = str(src_dir)
+    if sys.platform == "darwin":
+        # Tray-only: never re-enable the floating badge from LaunchAgent env.
+        env.setdefault("AMI_NO_MENU_BADGE", "1")
+    return env
 
 
 def _launch_working_directory() -> str | None:
@@ -85,6 +89,10 @@ def sync_autostart(enabled: bool) -> bool:
     """Apply config value to the OS; returns success."""
     if enabled:
         return enable_autostart()
+    # Non disabilitare l'agent mentre siamo noi il processo gestito da launchd
+    # (evita suicide al primo avvio se la config è momentaneamente False).
+    if sys.platform == "darwin" and os.environ.get("XPC_SERVICE_NAME") == MACOS_LABEL:
+        return True
     return disable_autostart()
 
 
@@ -157,12 +165,82 @@ def _macos_enable(command: str) -> bool:
         log_dir.mkdir(parents=True, exist_ok=True)
         plist["StandardOutPath"] = str(log_dir / "ami.stdout.log")
         plist["StandardErrorPath"] = str(log_dir / "ami.stderr.log")
+
+        # Se il plist è già allineato, non toccare launchctl (bootout ucciderebbe AMI in esecuzione).
+        if _macos_plist_matches(plist):
+            return True
+
         with MACOS_PLIST.open("wb") as f:
             plistlib.dump(plist, f)
-        _macos_launchctl_load()
+        # Carica solo se l'agent non è già attivo; mai kickstart -k su noi stessi.
+        _macos_launchctl_ensure_loaded()
         return True
     except Exception:
         return False
+
+
+def _macos_plist_matches(desired: dict) -> bool:
+    if not MACOS_PLIST.is_file():
+        return False
+    try:
+        with MACOS_PLIST.open("rb") as f:
+            current = plistlib.load(f)
+        keys = (
+            "Label",
+            "ProgramArguments",
+            "RunAtLoad",
+            "KeepAlive",
+            "EnvironmentVariables",
+            "WorkingDirectory",
+        )
+        for k in keys:
+            if current.get(k) != desired.get(k):
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def _macos_launchctl_job_running() -> bool:
+    if sys.platform != "darwin":
+        return False
+    import subprocess
+
+    uid = os.getuid()
+    r = subprocess.run(
+        ["launchctl", "print", f"gui/{uid}/{MACOS_LABEL}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if r.returncode != 0:
+        return False
+    return "state = running" in (r.stdout or "")
+
+
+def _macos_launchctl_ensure_loaded() -> None:
+    """Load the LaunchAgent if missing — never bootout/kickstart a live AMI instance."""
+    if sys.platform != "darwin" or not MACOS_PLIST.is_file():
+        return
+    if _macos_launchctl_job_running():
+        return
+    import subprocess
+
+    uid = os.getuid()
+    target = f"gui/{uid}/{MACOS_LABEL}"
+    subprocess.run(
+        ["launchctl", "bootstrap", f"gui/{uid}", str(MACOS_PLIST)],
+        check=False,
+        capture_output=True,
+    )
+    subprocess.run(["launchctl", "enable", target], check=False, capture_output=True)
+    # kickstart without -k: start if not running; do not kill an existing process.
+    subprocess.run(["launchctl", "kickstart", target], check=False, capture_output=True)
+
+
+def _macos_launchctl_load() -> None:
+    # Back-compat alias used by older call sites / tests.
+    _macos_launchctl_ensure_loaded()
 
 
 def _macos_disable() -> bool:
@@ -173,28 +251,6 @@ def _macos_disable() -> bool:
         return True
     except Exception:
         return False
-
-
-def _macos_launchctl_load() -> None:
-    if sys.platform != "darwin" or not MACOS_PLIST.is_file():
-        return
-    import subprocess
-
-    uid = os.getuid()
-    target = f"gui/{uid}/{MACOS_LABEL}"
-    # bootout first so a rewritten plist is picked up
-    subprocess.run(
-        ["launchctl", "bootout", f"gui/{uid}", str(MACOS_PLIST)],
-        check=False,
-        capture_output=True,
-    )
-    subprocess.run(
-        ["launchctl", "bootstrap", f"gui/{uid}", str(MACOS_PLIST)],
-        check=False,
-        capture_output=True,
-    )
-    subprocess.run(["launchctl", "enable", target], check=False, capture_output=True)
-    subprocess.run(["launchctl", "kickstart", "-k", target], check=False, capture_output=True)
 
 
 def _macos_launchctl_unload() -> None:

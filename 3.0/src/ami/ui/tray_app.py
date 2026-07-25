@@ -115,7 +115,7 @@ def _macos_use_menu_badge(native_tray: bool) -> bool:
 
 
 def _position_macos_floating_window(win, *, margin: int = 12, offset_x: int = 0) -> None:
-    """Ancora una finestra in alto a destra, subito sotto la menu bar."""
+    """Ancora una finestra in alto a destra, subito sotto la menu bar (senza ruba-focus)."""
     app = QApplication.instance()
     if app is None or win is None:
         return
@@ -135,10 +135,11 @@ def _position_macos_floating_window(win, *, margin: int = 12, offset_x: int = 0)
     ag = screen.availableGeometry()
     x = ag.right() - win.width() - margin - offset_x
     y = ag.top() + margin
-    win.move(x, y)
+    if win.pos().x() != x or win.pos().y() != y:
+        win.move(x, y)
     if not win.isVisible():
         win.show()
-    win.raise_()
+    # Non chiamare raise_()/activateWindow(): causa flicker in sovrimpressione.
 
 
 def _effective_app_version(config: dict) -> str:
@@ -264,12 +265,13 @@ class SystemTrayApp:
             f"icon_null={self.tray_icon.icon().isNull()}"
         )
         if sys.platform == "darwin":
-            for ms in (50, 150, 400, 1000, 2500):
+            # Pochi reassert all'avvio: troppi facevano lampeggiare l'icona in menu bar.
+            for ms in (0, 400):
                 QTimer.singleShot(ms, self._reassert_macos_tray)
             if self._native_macos_tray:
                 self._tray_heartbeat = QTimer()
                 self._tray_heartbeat.timeout.connect(self._heartbeat_macos_tray)
-                self._tray_heartbeat.start(10000)
+                self._tray_heartbeat.start(15000)
         if sys.platform == "darwin" and not self._native_macos_tray and not QSystemTrayIcon.isSystemTrayAvailable():
             QMessageBox.warning(
                 None,
@@ -424,11 +426,11 @@ class SystemTrayApp:
         cs = getattr(self, "compact_status", None)
         if cs is None:
             return
+        # Non forzare raise periodico: solo ripristina se l'utente l'ha chiusa per sbaglio.
+        if cs.isVisible():
+            return
         badge_offset = 150 if getattr(self, "_macos_menu_badge", None) is not None else 0
         _position_macos_floating_window(cs, margin=16, offset_x=badge_offset)
-        badge = getattr(self, "_macos_menu_badge", None)
-        if badge is not None:
-            badge.show()
 
     def _allow_splash_close(self) -> None:
         self._splash_closable = True
@@ -870,8 +872,7 @@ class SystemTrayApp:
             present = bool(tray.isVisible())
         if present:
             self._macos_tray_misses = 0
-            if hasattr(tray, "reassert"):
-                tray.reassert()
+            # Non chiamare reassert() a ogni heartbeat: fa lampeggiare l'icona in menu bar.
             return
         self._macos_tray_misses = getattr(self, "_macos_tray_misses", 0) + 1
         _tray_debug(f"native tray miss count={self._macos_tray_misses}")

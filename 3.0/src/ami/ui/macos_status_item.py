@@ -311,6 +311,13 @@ class MacOSTrayIcon(QObject):
         self.reassert()
 
     def reassert(self) -> None:
+        # Evita flicker: se lo slot è già visibile con icona/titolo, non toccare AppKit.
+        if self.menu_bar_present():
+            try:
+                if self._status_item is not None and self._status_item.isVisible():
+                    return
+            except Exception:
+                pass
         macos_reassert_regular_activation_policy()
         try:
             self._status_item.setBehavior_(0)
