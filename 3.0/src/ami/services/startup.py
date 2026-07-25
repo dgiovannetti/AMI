@@ -144,7 +144,8 @@ def _macos_enable(command: str) -> bool:
             "Label": MACOS_LABEL,
             "ProgramArguments": parts,
             "RunAtLoad": True,
-            "KeepAlive": False,
+            # Rilancia solo dopo crash/uscita anomala (non dopo Exit dal menu).
+            "KeepAlive": {"SuccessfulExit": False},
         }
         env = _launch_environment()
         if env:
@@ -152,8 +153,13 @@ def _macos_enable(command: str) -> bool:
         workdir = _launch_working_directory()
         if workdir:
             plist["WorkingDirectory"] = workdir
+        log_dir = Path.home() / "Library" / "Logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        plist["StandardOutPath"] = str(log_dir / "ami.stdout.log")
+        plist["StandardErrorPath"] = str(log_dir / "ami.stderr.log")
         with MACOS_PLIST.open("wb") as f:
             plistlib.dump(plist, f)
+        _macos_launchctl_load()
         return True
     except Exception:
         return False
@@ -161,11 +167,54 @@ def _macos_enable(command: str) -> bool:
 
 def _macos_disable() -> bool:
     try:
+        _macos_launchctl_unload()
         if MACOS_PLIST.is_file():
             MACOS_PLIST.unlink()
         return True
     except Exception:
         return False
+
+
+def _macos_launchctl_load() -> None:
+    if sys.platform != "darwin" or not MACOS_PLIST.is_file():
+        return
+    import subprocess
+
+    uid = os.getuid()
+    target = f"gui/{uid}/{MACOS_LABEL}"
+    # bootout first so a rewritten plist is picked up
+    subprocess.run(
+        ["launchctl", "bootout", f"gui/{uid}", str(MACOS_PLIST)],
+        check=False,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["launchctl", "bootstrap", f"gui/{uid}", str(MACOS_PLIST)],
+        check=False,
+        capture_output=True,
+    )
+    subprocess.run(["launchctl", "enable", target], check=False, capture_output=True)
+    subprocess.run(["launchctl", "kickstart", "-k", target], check=False, capture_output=True)
+
+
+def _macos_launchctl_unload() -> None:
+    if sys.platform != "darwin":
+        return
+    import subprocess
+
+    uid = os.getuid()
+    if MACOS_PLIST.is_file():
+        subprocess.run(
+            ["launchctl", "bootout", f"gui/{uid}", str(MACOS_PLIST)],
+            check=False,
+            capture_output=True,
+        )
+    else:
+        subprocess.run(
+            ["launchctl", "bootout", f"gui/{uid}/{MACOS_LABEL}"],
+            check=False,
+            capture_output=True,
+        )
 
 
 def _split_command(command: str) -> list[str]:
