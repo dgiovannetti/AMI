@@ -48,6 +48,7 @@ class SettingsDialog(QDialog):
         self._init_logging_tab()
         self._init_api_tab()
         self._init_speed_test_tab()
+        self._init_startup_tab()
         self._init_ui_tab()
         btn_row = QHBoxLayout()
         btn_row.addStretch()
@@ -218,6 +219,19 @@ class SettingsDialog(QDialog):
         layout.addRow("Tier high (Fast ≥ this):", self.speed_test_tier_high)
         self.tabs.addTab(tab, "Speed test")
 
+    def _init_startup_tab(self) -> None:
+        tab = QWidget()
+        form = QFormLayout(tab)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        st = self._config.get("startup", {})
+        self.auto_start = QCheckBox("Start AMI automatically when you log in")
+        self.auto_start.setChecked(bool(st.get("auto_start", False)))
+        self.auto_start.setToolTip(
+            "Windows: Run registry entry. macOS: LaunchAgent in ~/Library/LaunchAgents/."
+        )
+        form.addRow("", self.auto_start)
+        self.tabs.addTab(tab, "Startup")
+
     def _init_ui_tab(self) -> None:
         tab = QWidget()
         form = QFormLayout(tab)
@@ -284,6 +298,8 @@ class SettingsDialog(QDialog):
         cfg["speed_test"]["warmup_mb"] = float(self.speed_test_warmup_mb.value())
         cfg["speed_test"]["tier_low_mbps"] = int(self.speed_test_tier_low.value())
         cfg["speed_test"]["tier_high_mbps"] = int(self.speed_test_tier_high.value())
+        cfg.setdefault("startup", {})
+        cfg["startup"]["auto_start"] = bool(self.auto_start.isChecked())
         cfg.setdefault("ui", {})
         cfg["ui"]["theme"] = self.theme.currentText()
         cfg["ui"]["show_dashboard_on_start"] = bool(self.show_dash.isChecked())

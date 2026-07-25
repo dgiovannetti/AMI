@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ami"
-version = "3.1.4"
+version = "3.2.0"
 description = "Active Monitor of Internet - Real-time connectivity monitoring"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -13,7 +13,6 @@ requires-python = ">=3.10"
 dependencies = [
     "PyQt6>=6.8.0",
     "requests>=2.31.0",
-    "aiohttp>=3.9.0",
     "ping3>=4.0.4",
     "psutil>=5.9.0",
     "matplotlib>=3.8.0",
@@ -21,6 +20,7 @@ dependencies = [
     "packaging>=23.2",
     "platformdirs>=4.0.0",
     "jsonschema>=4.20.0",
+    "pyobjc-framework-Cocoa>=10.0; sys_platform == 'darwin'",
 ]
 
 [project.optional-dependencies]

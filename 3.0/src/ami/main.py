@@ -10,10 +10,12 @@ if getattr(sys, "frozen", False) and sys.platform == "darwin":
 
     apply_if_needed()
 
+from ami.ui.qt_safe import install_exception_handlers
 from ami.ui.tray_app import main as tray_main
 
 
 def main() -> None:
+    install_exception_handlers()
     tray_main()
 
 

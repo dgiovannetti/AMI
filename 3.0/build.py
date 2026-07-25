@@ -47,6 +47,15 @@ def check_requirements() -> bool:
     if missing:
         print(f"\nMissing: {', '.join(missing)}. Install with: pip install -r requirements.txt")
         return False
+    if sys.platform == "darwin":
+        try:
+            __import__("AppKit")
+            print("  [OK] PyObjC (AppKit)")
+        except ImportError:
+            print("  [FAIL] PyObjC (AppKit). Native menu bar tray requires: pip install pyobjc-framework-Cocoa")
+            missing.append("PyObjC")
+            print(f"\nMissing: {', '.join(missing)}. Install with: pip install -r requirements.txt")
+            return False
     try:
         __import__("PyInstaller")
         print("  [OK] PyInstaller")
@@ -190,6 +199,11 @@ def build_executable() -> bool:
         "--hidden-import=ami.ui.update_dialog",
         "--hidden-import=ami.ui.compact_status",
         "--hidden-import=ami.ui.themes",
+        "--hidden-import=ami.ui.qt_safe",
+        "--hidden-import=ami.ui.macos_status_item",
+        "--hidden-import=ami.ui.macos_menu_bar_badge",
+        "--hidden-import=ami.ui.macos_control_panel",
+        "--hidden-import=ami.services.startup",
         "--hidden-import=ping3",
         "--hidden-import=matplotlib",
         "--hidden-import=numpy",
@@ -281,7 +295,7 @@ Il primo avvio dal .app è più lento che `python -m ami.main` (PyInstaller cari
    Impostazioni → Privacy e sicurezza → scorri fino al messaggio su AMI → «Apri comunque».
    Senza account Apple Developer (firma + notarizzazione) l’avviso può comparire al primo avvio.
 
-ZIP corretto dalla pagina Release: nome file deve contenere «macos», es. AMI-v3.1.4-macos.zip
+ZIP corretto dalla pagina Release: nome file deve contenere «macos», es. AMI-v3.2.0-macos.zip
 (non usare vecchi pacchetti «AMI-macOS.zip» se ancora presenti).
 """,
             encoding="utf-8",

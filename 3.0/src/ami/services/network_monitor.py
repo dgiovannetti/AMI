@@ -61,17 +61,28 @@ class NetworkMonitor:
     def ping_host(self, host: str, timeout: int = 5) -> PingResult:
         """Ping a single host (ICMP or TCP fallback)."""
         try:
-            if sys.platform in ["darwin", "linux"]:
+            if sys.platform == "win32":
                 try:
-                    param = "-n" if sys.platform == "win32" else "-c"
-                    timeout_param = "-W"
-                    timeout_seconds = str(timeout)
-                    kwargs = {"capture_output": True, "text": True}
-                    if sys.platform == "win32":
-                        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
                     result = subprocess.run(
-                        ["ping", param, "1", timeout_param, timeout_seconds, host],
-                        **kwargs,
+                        ["ping", "-n", "1", "-w", str(timeout * 1000), host],
+                        capture_output=True,
+                        text=True,
+                        creationflags=subprocess.CREATE_NO_WINDOW,
+                        timeout=timeout + 1,
+                    )
+                    if result.returncode == 0 and "time=" in result.stdout.lower():
+                        time_str = result.stdout.lower().split("time=")[1].split()[0]
+                        latency = float(time_str.replace("ms", ""))
+                        return PingResult(host=host, success=True, latency_ms=latency)
+                except (subprocess.TimeoutExpired, subprocess.SubprocessError, ValueError):
+                    pass
+            elif sys.platform in ("darwin", "linux"):
+                try:
+                    timeout_flag = "-W" if sys.platform == "darwin" else "-w"
+                    result = subprocess.run(
+                        ["ping", "-c", "1", timeout_flag, str(timeout), host],
+                        capture_output=True,
+                        text=True,
                         timeout=timeout + 1,
                     )
                     if result.returncode == 0 and "time=" in result.stdout:
@@ -127,38 +138,107 @@ class NetworkMonitor:
                 continue
         return False
 
+    def _default_gateway(self) -> Optional[str]:
+        """Best-effort default gateway for the current platform."""
+        try:
+            if sys.platform == "darwin":
+                out = subprocess.check_output(
+                    ["route", "-n", "get", "default"], text=True, timeout=2
+                )
+                for line in out.splitlines():
+                    if line.strip().startswith("gateway:"):
+                        gw = line.split(":", 1)[1].strip()
+                        if gw:
+                            return gw
+            elif sys.platform == "linux":
+                out = subprocess.check_output(["ip", "route"], text=True, timeout=2)
+                for line in out.splitlines():
+                    if line.startswith("default"):
+                        parts = line.split()
+                        if len(parts) >= 3:
+                            return parts[2]
+            elif sys.platform == "win32":
+                out = subprocess.check_output(
+                    ["ipconfig"],
+                    text=True,
+                    timeout=3,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                )
+                for line in out.splitlines():
+                    if "Default Gateway" in line:
+                        gw = line.split(":")[-1].strip()
+                        if gw and gw != "0.0.0.0":
+                            return gw
+        except Exception:
+            pass
+        return None
+
+    def _has_active_lan_interface(self) -> bool:
+        """True if a non-loopback IPv4 interface is up (no gateway required)."""
+        try:
+            addrs = psutil.net_if_addrs()
+            stats = psutil.net_if_stats()
+            skip_prefixes = ("lo", "awdl", "llw", "bridge")
+            for name, stat in stats.items():
+                if not stat.isup or name.startswith(skip_prefixes):
+                    continue
+                for addr in addrs.get(name, []):
+                    if addr.family == socket.AF_INET and not addr.address.startswith("127."):
+                        return True
+        except Exception:
+            pass
+        return False
+
     def check_local_network(self) -> bool:
-        """Check if local network is available."""
+        """Check if local network is available (gateway or active LAN interface)."""
         try:
             if sys.platform == "win32":
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(1)
                 try:
-                    for gateway in ["192.168.1.1", "192.168.0.1", "10.0.0.1"]:
+                    candidates = []
+                    gw = self._default_gateway()
+                    if gw:
+                        candidates.append(gw)
+                    candidates.extend(["192.168.1.1", "192.168.0.1", "10.0.0.1"])
+                    seen = set()
+                    for gateway in candidates:
+                        if not gateway or gateway in seen:
+                            continue
+                        seen.add(gateway)
                         try:
                             sock.connect((gateway, 80))
                             sock.close()
                             return True
                         except Exception:
+                            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                            sock.settimeout(1)
                             continue
-                    return False
+                    return self._has_active_lan_interface()
                 finally:
                     try:
                         sock.close()
                     except Exception:
                         pass
-            return True
+
+            gateway = self._default_gateway()
+            if gateway:
+                return self.ping_host(gateway, timeout=2).success
+            return self._has_active_lan_interface()
         except Exception:
             return False
 
     def ping_all_hosts(self) -> List[PingResult]:
         """Ping all configured hosts in parallel."""
         results: List[PingResult] = []
+        lock = threading.Lock()
 
         def worker(h: str) -> None:
-            results.append(self.ping_host(h, self.timeout))
+            result = self.ping_host(h, self.timeout)
+            with lock:
+                results.append(result)
 
-        threads = [threading.Thread(target=worker, args=(h,)) for h in self.hosts]
+        threads = [threading.Thread(target=worker, args=(h,), daemon=True) for h in self.hosts]
         for t in threads:
             t.start()
         for t in threads:
@@ -179,6 +259,8 @@ class NetworkMonitor:
         internet_ok = success_count > 0 and http_ok
 
         if success_count == 0:
+            status = "offline"
+        elif not local_ok and not http_ok:
             status = "offline"
         elif success_rate < (100 - self.unstable_loss) or (
             avg_latency and avg_latency > self.unstable_latency
@@ -335,8 +417,13 @@ class NetworkMonitor:
                     pass
                 try:
                     out = subprocess.check_output(["ifconfig"], text=True, timeout=2)
-                    if re.search(r"\butun\d+\b", out) or "utun" in out or "tun" in out:
-                        self._last_vpn_status = (True, "tun/utun")
+                    # utun0–2 are often system/iCloud; VPN adapters usually have inet + higher index.
+                    if re.search(
+                        r"^utun([3-9]|\d{2,}):[^\n]*\n(?:[^\n]*\n)*?\s+inet ",
+                        out,
+                        re.MULTILINE,
+                    ):
+                        self._last_vpn_status = (True, "utun")
                         self._last_vpn_check_ts = now
                         return self._last_vpn_status
                 except Exception:

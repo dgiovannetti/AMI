@@ -1,12 +1,11 @@
 """
-AMI 3.0 — Compact status window (Dock fallback): minimal chrome, no nested frames.
+AMI 3.0 — Compact status window (Dock / menu-bar fallback).
 """
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QFont, QIcon, QCloseEvent
+from PyQt6.QtGui import QFont, QIcon, QCloseEvent
 from PyQt6.QtWidgets import (
     QFrame,
-    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -18,7 +17,7 @@ from ami.ui.themes import resolve_theme
 
 
 class CompactStatusWindow(QFrame):
-    """Small floating status; avoids global theme QFrame borders on content."""
+    """Small floating status; always-on-top on macOS."""
 
     def __init__(self, config: dict, monitor, tray_icon, parent=None):
         super().__init__(parent)
@@ -27,26 +26,25 @@ class CompactStatusWindow(QFrame):
         self.tray_icon = tray_icon
         self.setObjectName("CompactStatusWindow")
         self.setWindowTitle("AMI")
-        self.setWindowFlags(Qt.WindowType.Window)
-        self.setFixedSize(168, 128)
+        flags = Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint
+        self.setWindowFlags(flags)
+        self.setFixedSize(180, 140)
 
         theme = config.get("ui", {}).get("theme", "auto")
         self._dark = resolve_theme(theme) == "dark"
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(32)
-        shadow.setOffset(0, 12)
-        shadow.setColor(QColor(0, 0, 0, 38 if self._dark else 22))
-        self.setGraphicsEffect(shadow)
-
         self.setStyleSheet(self._shell_qss())
 
         lay = QVBoxLayout(self)
         lay.setSpacing(2)
         lay.setContentsMargins(16, 14, 16, 12)
 
-        # Single visual anchor: large status dot (no extra pill / box)
+        title = QLabel("AMI")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setFont(QFont("Helvetica Neue", 12, QFont.Weight.Bold))
+        title.setStyleSheet(self._lbl_qss("#94a3b8" if self._dark else "#57534e"))
+        lay.addWidget(title)
+
         self.status_label = QLabel("●")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_label.setFont(QFont("Helvetica Neue", 36, QFont.Weight.Black))
@@ -92,18 +90,16 @@ class CompactStatusWindow(QFrame):
         if self._dark:
             return """
                 QFrame#CompactStatusWindow {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                        stop:0 #0c1220, stop:1 #111827);
-                    border: none;
-                    border-radius: 20px;
+                    background: #0f172a;
+                    border: 2px solid #10b981;
+                    border-radius: 16px;
                 }
             """
         return """
             QFrame#CompactStatusWindow {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #faf8f6, stop:1 #f0ebe6);
-                border: none;
-                border-radius: 20px;
+                background: #ffffff;
+                border: 2px solid #10b981;
+                border-radius: 16px;
             }
         """
 
@@ -125,12 +121,25 @@ class CompactStatusWindow(QFrame):
     def update_status(self, status) -> None:
         if status.status == "online":
             color = "#2dd4bf"
+            border = "#10b981"
         elif status.status == "unstable":
             color = "#fbbf24"
+            border = "#f59e0b"
         else:
             color = "#fb7185"
+            border = "#ef4444"
         self.status_label.setText("●")
         self.status_label.setStyleSheet(self._lbl_qss(color))
+        bg = "#0f172a" if self._dark else "#ffffff"
+        self.setStyleSheet(
+            f"""
+            QFrame#CompactStatusWindow {{
+                background: {bg};
+                border: 2px solid {border};
+                border-radius: 16px;
+            }}
+            """
+        )
 
         if getattr(status, "avg_latency_ms", None) is not None:
             self.latency_label.setText(f"{status.avg_latency_ms:.0f}")
@@ -140,11 +149,16 @@ class CompactStatusWindow(QFrame):
             self.latency_unit.setVisible(False)
 
     def _show_menu(self) -> None:
-        if self.tray_icon and self.tray_icon.contextMenu():
-            menu = self.tray_icon.contextMenu()
+        menu = None
+        if self.tray_icon is not None:
+            getter = getattr(self.tray_icon, "contextMenu", None)
+            if callable(getter):
+                menu = getter()
+            if menu is None:
+                menu = getattr(self.tray_icon, "_context_menu", None)
+        if menu is not None:
             menu.exec(self.menu_btn.mapToGlobal(self.menu_btn.rect().bottomLeft()))
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        """Non distruggere: nascondi così si può riaprire da menu tray o Dock."""
         event.ignore()
         self.hide()

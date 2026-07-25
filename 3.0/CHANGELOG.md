@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 3.2.0
+
+- **macOS tray-only UX**: niente badge flottante sotto la menu bar (interrompeva con `raise` ogni 2 s). Resta **solo l’icona nativa in menu bar** (`NSStatusItem`). Badge opzionale con `AMI_FORCE_BADGE=1`.
+- **macOS stabilità post-splash**: chiusura splash differita + `_finalize_macos_startup_ui`; meno `processEvents` in init (`ExcludeUserInputEvents`); dock handler differito; slot critici con `@safe_slot`.
+- **macOS badge elevate** (se abilitato): fix import `c_void_p` + elevazione `NSFloatingWindowLevel` senza ruba-focus periodico.
+- **Tray recovery**: se lo status item sparisce → `recreate` → titolo testo `AMI ✓/!/✕` → (solo se forzato) badge.
+- **Dipendenze**: `pyobjc-framework-Cocoa` in `pyproject.toml`; check `AppKit` in `build.py` su Darwin.
+- **Avvio locale**: messaggi `run_local.sh` allineati (tray / overflow `«»`, non “finestra al centro”).
+
 - **Avvio locale / config**: migrazione 2.x→3.x **salvata su disco** al load (prima restava `2.0.0` nel file utente). OTA usa la versione **≥ `ami.__version__`**. Script **`3.0/run_local.sh`** (riavvio affidabile; `pkill || true` se non c’era già un’istanza).
 - **macOS Dock / Finder**: `AMI.app` usa **`resources/ami.icns`** nel BUNDLE PyInstaller. Menu bar = PNG `status_*.png`.
 - **macOS Dock da sorgente** (`python -m ami.main`): **`NSApplicationActivationPolicyRegular`** + `setWindowIcon` (`ami.png` / `ami.icns`) — senza policy Regular l’icona Dock **sparisce** dopo lo splash (app solo menu bar). Grace period 8 s prima di riaprire dashboard al click Dock.

@@ -26,8 +26,10 @@ from ami.services.logger import EventLogger
 from ami.services.network_monitor import NetworkMonitor
 from ami.services.notifier import Notifier
 from ami.services.speed_test import run_speed_test
+from ami.services.startup import sync_autostart
 from ami.services.updater import UpdateManager
 from ami.ui.compact_status import CompactStatusWindow
+from ami.ui.qt_safe import install_exception_handlers, safe_slot
 from ami.ui.settings_dialog import SettingsDialog
 from ami.ui.splash_screen import UltraModernSplashScreen
 from ami.ui.update_dialog import UpdateDialog
@@ -40,6 +42,16 @@ def _is_pyinstaller_frozen() -> bool:
 def _tray_debug(msg: str) -> None:
     if os.environ.get("AMI_DEBUG_TRAY", "").strip() in ("1", "true", "yes"):
         print(f"[AMI tray] {msg}", file=sys.stderr, flush=True)
+
+
+def _process_init_events(app: QApplication) -> None:
+    """Process pending events during init without handling user input (macOS crash guard)."""
+    try:
+        from PyQt6.QtCore import QEventLoop
+
+        app.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
+    except (AttributeError, TypeError, ImportError):
+        app.processEvents()
 
 
 def _log_ami_quit() -> None:
@@ -81,11 +93,52 @@ def _apply_macos_dock_presence(app: QApplication) -> None:
 
 
 def _effective_compact_status_window(config: dict) -> bool:
-    """Default: off — menu bar + Dock; compact window only if explicitly enabled."""
+    """Rispetta config; override con AMI_FORCE_COMPACT / AMI_NO_COMPACT."""
+    if os.environ.get("AMI_FORCE_COMPACT", "").strip() in ("1", "true", "yes"):
+        return True
+    if os.environ.get("AMI_NO_COMPACT", "").strip() in ("1", "true", "yes"):
+        return False
     v = config.get("ui", {}).get("compact_status_window")
     if v is None:
         return False
     return bool(v)
+
+
+def _macos_use_menu_badge(native_tray: bool) -> bool:
+    """Badge flottante: OFF di default (interrompe e va in sovrimpressione). Solo con AMI_FORCE_BADGE=1."""
+    if os.environ.get("AMI_NO_MENU_BADGE", "").strip() in ("1", "true", "yes"):
+        return False
+    if os.environ.get("AMI_FORCE_BADGE", "").strip() in ("1", "true", "yes"):
+        return True
+    # Tray nativa in menu bar è sufficiente; niente pannello sotto la barra.
+    return False
+
+
+def _position_macos_floating_window(win, *, margin: int = 12, offset_x: int = 0) -> None:
+    """Ancora una finestra in alto a destra, subito sotto la menu bar."""
+    app = QApplication.instance()
+    if app is None or win is None:
+        return
+    screen = None
+    try:
+        pt = QCursor.pos()
+        for s in app.screens():
+            if s.geometry().contains(pt):
+                screen = s
+                break
+    except Exception:
+        screen = None
+    if screen is None:
+        screen = app.primaryScreen()
+    if screen is None:
+        return
+    ag = screen.availableGeometry()
+    x = ag.right() - win.width() - margin - offset_x
+    y = ag.top() + margin
+    win.move(x, y)
+    if not win.isVisible():
+        win.show()
+    win.raise_()
 
 
 def _effective_app_version(config: dict) -> str:
@@ -138,9 +191,13 @@ class SystemTrayApp:
         # Non collegare applicationStateChanged qui: durante __init__ processEvents() può
         # emettere ApplicationActive; aprire finestre da quello stack su macOS → qFatal/SIGABRT (Qt 6 + Cocoa).
         self._startup_complete = False
+        self._macos_post_splash_finalized = False
+        self._macos_startup_panel_shown = False
+        self._macos_tray_title_fallback = False
         self.config = self.load_config()
         app_version = _effective_app_version(self.config)
         use_compact = _effective_compact_status_window(self.config)
+        sync_autostart(self.config.get("startup", {}).get("auto_start", False))
         # Cache icone tray macOS (template da PNG per path)
         self._macos_tray_icon_cache: dict[str, QIcon] = {}
 
@@ -177,13 +234,31 @@ class SystemTrayApp:
         self.tray_icon.setToolTip("AMI - Starting...")
         self.create_menu()
         self.tray_icon.activated.connect(self.on_tray_activated)
+        self._macos_menu_badge = None
+        self._macos_control_panel = None
+        if sys.platform == "darwin":
+            from ami.ui.macos_control_panel import create_macos_control_panel
+            from ami.ui.macos_menu_bar_badge import create_macos_menu_bar_badge
+
+            self._macos_control_panel = create_macos_control_panel(self.tray_icon)
+            if self._macos_control_panel is not None:
+                self._macos_control_panel.set_dashboard_callback(self.show_dashboard)
+
+            self._macos_menu_badge = None
+            if _macos_use_menu_badge(self._native_macos_tray):
+                self._macos_menu_badge = create_macos_menu_bar_badge(self.app)
+            if self._macos_menu_badge is not None:
+                self._macos_menu_badge.setContextMenu(self._tray_menu)
+                st = getattr(self, "current_status", None)
+                sk = st.status if st and getattr(st, "status", None) else "offline"
+                self._apply_tray_icon_for_status(sk)
         if self._native_macos_tray:
             self.tray_icon.show()
         elif sys.platform == "darwin":
             QTimer.singleShot(0, self._first_show_macos_tray)
         else:
             self.tray_icon.show()
-            self.app.processEvents()
+            _process_init_events(self.app)
         _tray_debug(
             f"frozen={_is_pyinstaller_frozen()} tray_available={QSystemTrayIcon.isSystemTrayAvailable()} "
             f"icon_null={self.tray_icon.icon().isNull()}"
@@ -214,29 +289,25 @@ class SystemTrayApp:
             self.splash = UltraModernSplashScreen(version=app_version)
             self.splash.show()
             self.splash.showMessage("Loading configuration...")
-            self.app.processEvents()
 
         def splash_msg(msg: str) -> None:
             if self.splash:
                 self.splash.showMessage(msg)
 
         splash_msg("Initializing network monitor...")
-        self.app.processEvents()
         self.monitor = NetworkMonitor(self.config)
         splash_msg("Starting logger...")
-        self.app.processEvents()
         self.logger = EventLogger(self.config)
         splash_msg("Preparing notifications...")
-        self.app.processEvents()
         self.notifier = Notifier(self.config)
         self.notifier.tray_icon = self.tray_icon
         splash_msg("Starting API server...")
-        self.app.processEvents()
         self.api_server = APIServer(self.config, self.monitor)
         self.current_status = None
         self.monitor_thread = None
         splash_msg("Finalizing...")
-        self.app.processEvents()
+        if self.splash:
+            _process_init_events(self.app)
         self.api_server.start()
         self.update_icon("offline")
         interval = self.config["monitoring"]["polling_interval"] * 1000
@@ -246,7 +317,14 @@ class SystemTrayApp:
         self.compact_status = None
         if use_compact:
             self.compact_status = CompactStatusWindow(self.config, self.monitor, self.tray_icon)
+            badge_offset = 150 if getattr(self, "_macos_menu_badge", None) is not None else 0
+            _position_macos_floating_window(self.compact_status, margin=16, offset_x=badge_offset)
             self.compact_status.show()
+            self.compact_status.raise_()
+        if sys.platform == "darwin" and use_compact:
+            self._macos_compact_keepalive = QTimer()
+            self._macos_compact_keepalive.timeout.connect(self._ensure_macos_compact_visible)
+            self._macos_compact_keepalive.start(5000)
         self.check_connection()
         self.dashboard = None
         self._speed_test_busy = False
@@ -264,24 +342,191 @@ class SystemTrayApp:
             self._splash_closable = False
             QTimer.singleShot(1500, self._allow_splash_close)
             QTimer.singleShot(3000, self.close_splash)
+        elif sys.platform == "darwin":
+            QTimer.singleShot(0, self._finalize_macos_startup_ui)
         if self.config.get("ui", {}).get("show_dashboard_on_start", False) or os.environ.get("AMI_FORCE_DASHBOARD") == "1":
-            QTimer.singleShot(2500, self.show_dashboard)
+            if sys.platform == "darwin" and getattr(self, "_macos_control_panel", None) is not None:
+                QTimer.singleShot(400, self._macos_control_panel.show_centered)
+            else:
+                QTimer.singleShot(2500, self.show_dashboard)
+        elif sys.platform == "darwin" and getattr(self, "_macos_control_panel", None) is not None:
+            if self._should_auto_show_macos_control_panel():
+                QTimer.singleShot(400, self._macos_control_panel.show_centered)
 
         self._startup_complete = True
+        self._macos_tray_misses = 0
         if sys.platform == "darwin":
+            # Differisci: collegare troppo presto → applicationStateChanged + show UI → qFatal.
+            QTimer.singleShot(8000, self._connect_macos_dock_handler)
+            if getattr(self, "_macos_menu_badge", None) is not None:
+                QTimer.singleShot(0, safe_slot(lambda: self._macos_menu_badge.show()))
+
+    def _connect_macos_dock_handler(self) -> None:
+        try:
             self.app.applicationStateChanged.connect(self._on_application_state_changed)
+            _tray_debug("macOS dock handler connected (post grace period)")
+        except Exception as exc:
+            _tray_debug(f"dock handler connect failed: {exc}")
+
+    def _should_auto_show_macos_control_panel(self) -> bool:
+        if os.environ.get("AMI_SHOW_PANEL", "").strip() in ("1", "true", "yes"):
+            return True
+        if os.environ.get("AMI_NO_PANEL", "").strip() in ("1", "true", "yes"):
+            return False
+        if getattr(self, "_native_macos_tray", False):
+            return False
+        return True
+
+    def _notify_user(
+        self,
+        title: str,
+        message: str,
+        level: str = "info",
+        *,
+        respect_enabled: bool = False,
+    ) -> None:
+        notifier = getattr(self, "notifier", None)
+        if notifier is not None:
+            notifier.notify_message(
+                title,
+                message,
+                level=level,
+                respect_enabled=respect_enabled,
+                play_sound=False,
+            )
+            return
+        icon_map = {
+            "info": QSystemTrayIcon.MessageIcon.Information,
+            "warning": QSystemTrayIcon.MessageIcon.Warning,
+            "error": QSystemTrayIcon.MessageIcon.Critical,
+        }
+        self.tray_icon.showMessage(
+            title,
+            message,
+            icon_map.get(level, QSystemTrayIcon.MessageIcon.Information),
+            3500,
+        )
+
+    @safe_slot
+    def _macos_activate_front(self) -> None:
+        """Raise already-visible UI only — never force-create the control panel (crash path)."""
+        if getattr(self, "_native_macos_tray", False):
+            if hasattr(self.tray_icon, "reassert"):
+                self.tray_icon.reassert()
+            return
+        panel = getattr(self, "_macos_control_panel", None)
+        if panel is not None and panel.isVisible():
+            panel.raise_()
+            panel.activateWindow()
+
+    @safe_slot
+    def _ensure_macos_compact_visible(self) -> None:
+        cs = getattr(self, "compact_status", None)
+        if cs is None:
+            return
+        badge_offset = 150 if getattr(self, "_macos_menu_badge", None) is not None else 0
+        _position_macos_floating_window(cs, margin=16, offset_x=badge_offset)
+        badge = getattr(self, "_macos_menu_badge", None)
+        if badge is not None:
+            badge.show()
 
     def _allow_splash_close(self) -> None:
         self._splash_closable = True
         if self.current_status and not self._splash_closed:
             self.close_splash()
 
+    @safe_slot
     def close_splash(self) -> None:
         if self._splash_closed:
             return
         self._splash_closed = True
         if self.splash is not None:
-            self.splash.fade_out()
+            splash = self.splash
+            splash.fade_out(callback=lambda: QTimer.singleShot(0, self._on_splash_closed))
+
+    @safe_slot
+    def _on_splash_closed(self) -> None:
+        self.splash = None
+        if sys.platform == "darwin":
+            QTimer.singleShot(0, self._finalize_macos_startup_ui)
+
+    @safe_slot
+    def _finalize_macos_startup_ui(self) -> None:
+        """Stabilize macOS UI after splash closes — never run synchronously from fade_out stack."""
+        if getattr(self, "_macos_post_splash_finalized", False):
+            return
+        self._macos_post_splash_finalized = True
+        _tray_debug("macOS post-splash finalize")
+        try:
+            from ami.ui.macos_status_item import macos_reassert_regular_activation_policy
+
+            macos_reassert_regular_activation_policy()
+        except Exception as exc:
+            _tray_debug(f"post-splash activation policy skipped: {exc}")
+        if hasattr(self.tray_icon, "reassert"):
+            self.tray_icon.reassert()
+        self._recover_macos_tray_visibility()
+        badge = getattr(self, "_macos_menu_badge", None)
+        if badge is not None:
+            badge.show()
+        # Solo tray: non aprire pannello/badge se la menu bar ha già l'icona nativa.
+        if getattr(self, "_native_macos_tray", False):
+            return
+        if not self._main_ui_is_visible():
+            self._show_macos_startup_anchor()
+
+    @safe_slot
+    def _recover_macos_tray_visibility(self) -> None:
+        """Recreate tray, fall back to title mode, then badge/control panel."""
+        if not getattr(self, "_native_macos_tray", False):
+            return
+        tray = self.tray_icon
+        present = bool(tray.menu_bar_present()) if hasattr(tray, "menu_bar_present") else False
+        if present and not getattr(self, "_macos_tray_title_fallback", False):
+            return
+        if hasattr(tray, "recreate") and tray.recreate():
+            if tray.menu_bar_present():
+                _tray_debug("macOS tray recovered via recreate")
+                return
+        if hasattr(tray, "force_title_mode") and not getattr(self, "_macos_tray_title_fallback", False):
+            tray.force_title_mode()
+            self._macos_tray_title_fallback = True
+            _tray_debug("macOS tray recovered via title fallback")
+            return
+        self._ensure_macos_badge_fallback()
+        panel = getattr(self, "_macos_control_panel", None)
+        if panel is not None:
+            QTimer.singleShot(0, panel.show_centered)
+
+    @safe_slot
+    def _show_macos_startup_anchor(self) -> None:
+        """Brief centered panel when no window remains after splash (tray-only mode)."""
+        if getattr(self, "_macos_startup_panel_shown", False):
+            return
+        if self._main_ui_is_visible():
+            return
+        badge = getattr(self, "_macos_menu_badge", None)
+        if badge is not None:
+            badge.show()
+        panel = getattr(self, "_macos_control_panel", None)
+        if panel is None:
+            return
+        self._macos_startup_panel_shown = True
+        QTimer.singleShot(0, panel.show_centered)
+        QTimer.singleShot(5000, self._hide_macos_startup_panel_if_idle)
+
+    @safe_slot
+    def _hide_macos_startup_panel_if_idle(self) -> None:
+        panel = getattr(self, "_macos_control_panel", None)
+        if panel is None or not panel.isVisible():
+            return
+        compact = getattr(self, "compact_status", None)
+        if compact is not None and compact.isVisible():
+            return
+        try:
+            panel.hide()
+        except Exception:
+            pass
 
     def _main_ui_is_visible(self) -> bool:
         """True se c’è almeno una finestra principale visibile (esclusi menu popup)."""
@@ -295,15 +540,18 @@ class SystemTrayApp:
             return True
         return False
 
+    @safe_slot
     def _on_application_state_changed(self, state: Qt.ApplicationState) -> None:
-        """Dock: differito — mai show()/dashboard dallo stack di setApplicationState (crash Qt macOS)."""
+        """Dock: differito — mai show() dallo stack di setApplicationState (crash Qt macOS)."""
         if sys.platform != "darwin":
             return
         if state != Qt.ApplicationState.ApplicationActive:
             return
-        QTimer.singleShot(0, self._deferred_application_active_from_dock)
+        QTimer.singleShot(50, self._deferred_application_active_from_dock)
 
+    @safe_slot
     def _deferred_application_active_from_dock(self) -> None:
+        """Dock click: solo superfici leggere già create; niente dashboard/pannello forzati."""
         if not getattr(self, "_startup_complete", False):
             return
         if time.monotonic() < getattr(self, "_dock_resume_blocked_until", 0):
@@ -312,26 +560,38 @@ class SystemTrayApp:
             return
         if self._main_ui_is_visible():
             return
-        if _effective_compact_status_window(self.config) and getattr(self, "compact_status", None):
+        # Prefer compact / tray reassert — never open dashboard from dock (qFatal risk).
+        if getattr(self, "compact_status", None) is not None:
             self.compact_status.show()
             self.compact_status.raise_()
-            self.compact_status.activateWindow()
             return
-        self.show_dashboard()
+        if hasattr(self.tray_icon, "reassert"):
+            self.tray_icon.reassert()
+            return
+        badge = getattr(self, "_macos_menu_badge", None)
+        if badge is not None:
+            badge.show()
+            return
+        panel = getattr(self, "_macos_control_panel", None)
+        if panel is not None and panel.isVisible():
+            panel.raise_()
 
     def show_compact_status_window(self) -> None:
         if not _effective_compact_status_window(self.config):
-            self.tray_icon.showMessage(
+            self._notify_user(
                 "AMI",
                 "Enable “Compact status window” in Settings → UI, or use Dashboard from the menu.",
-                QSystemTrayIcon.MessageIcon.Information,
-                4000,
             )
             return
         if self.compact_status is None:
             self.compact_status = CompactStatusWindow(self.config, self.monitor, self.tray_icon)
             if self.current_status:
                 self.compact_status.update_status(self.current_status)
+        _position_macos_floating_window(
+            self.compact_status,
+            margin=16,
+            offset_x=150 if getattr(self, "_macos_menu_badge", None) is not None else 0,
+        )
         self.compact_status.show()
         self.compact_status.raise_()
         self.compact_status.activateWindow()
@@ -402,6 +662,7 @@ class SystemTrayApp:
             self.speed_test_timer.start(interval_ms)
         else:
             self.speed_test_timer = None
+        sync_autostart(new_config.get("startup", {}).get("auto_start", False))
 
     def create_menu(self) -> None:
         self._tray_menu = QMenu()
@@ -446,6 +707,12 @@ class SystemTrayApp:
             "online": "status_green.png",
             "unstable": "status_yellow.png",
         }.get(status, "status_red.png")
+        badge = getattr(self, "_macos_menu_badge", None)
+        if badge is not None and path.is_file():
+            badge.set_status_icon_path(path)
+        panel = getattr(self, "_macos_control_panel", None)
+        if panel is not None and path.is_file():
+            panel.set_status_icon_path(path)
         if getattr(self, "_native_macos_tray", False) and path.is_file():
             self.tray_icon.set_icon_from_path(path)
             return
@@ -565,7 +832,7 @@ class SystemTrayApp:
             self._apply_tray_icon_for_status("offline")
             self.tray_icon.setVisible(True)
             self.tray_icon.show()
-            self.app.processEvents()
+            _process_init_events(self.app)
             g = self.tray_icon.geometry()
             _tray_debug(
                 f"first_show macOS geometry={g.x()},{g.y()},{g.width()}x{g.height()} "
@@ -574,31 +841,66 @@ class SystemTrayApp:
         except Exception:
             pass
 
+    @safe_slot
     def _reassert_macos_tray(self) -> None:
+        if getattr(self, "_native_macos_tray", False) and hasattr(self.tray_icon, "reassert"):
+            self.tray_icon.reassert()
+        st = getattr(self, "current_status", None)
+        key = st.status if st and getattr(st, "status", None) else "offline"
+        self._apply_tray_icon_for_status(key)
+        if not getattr(self, "_native_macos_tray", False):
+            self.tray_icon.setVisible(True)
+            self.tray_icon.show()
+        g = self.tray_icon.geometry()
+        _tray_debug(
+            f"reassert status={key} icon_null={self.tray_icon.icon().isNull()} "
+            f"geometry={g.x()},{g.y()},{g.width()}x{g.height()}"
+        )
+
+    @safe_slot
+    def _heartbeat_macos_tray(self) -> None:
+        """Keep NSStatusItem alive; recreate or enable badge fallback if it vanishes."""
+        if not getattr(self, "_native_macos_tray", False):
+            return
+        tray = self.tray_icon
+        present = True
+        if hasattr(tray, "menu_bar_present"):
+            present = bool(tray.menu_bar_present())
+        elif hasattr(tray, "isVisible"):
+            present = bool(tray.isVisible())
+        if present:
+            self._macos_tray_misses = 0
+            if hasattr(tray, "reassert"):
+                tray.reassert()
+            return
+        self._macos_tray_misses = getattr(self, "_macos_tray_misses", 0) + 1
+        _tray_debug(f"native tray miss count={self._macos_tray_misses}")
+        self._recover_macos_tray_visibility()
+
+    def _ensure_macos_badge_fallback(self) -> None:
+        """Badge solo se esplicitamente abilitato (AMI_FORCE_BADGE); altrimenti solo tray."""
+        if not _macos_use_menu_badge(getattr(self, "_native_macos_tray", False)):
+            _tray_debug("macOS badge fallback skipped (tray-only mode)")
+            return
+        if getattr(self, "_macos_menu_badge", None) is not None:
+            try:
+                self._macos_menu_badge.show()
+            except Exception:
+                pass
+            return
         try:
-            if getattr(self, "_native_macos_tray", False) and hasattr(self.tray_icon, "reassert"):
-                self.tray_icon.reassert()
+            from ami.ui.macos_menu_bar_badge import MacOSMenuBarBadge
+
+            badge = MacOSMenuBarBadge(self.app)
+            badge.setContextMenu(getattr(self, "_tray_menu", None))
+            self._macos_menu_badge = badge
             st = getattr(self, "current_status", None)
             key = st.status if st and getattr(st, "status", None) else "offline"
             self._apply_tray_icon_for_status(key)
-            if not getattr(self, "_native_macos_tray", False):
-                self.tray_icon.setVisible(True)
-                self.tray_icon.show()
-            self.app.processEvents()
-            g = self.tray_icon.geometry()
-            _tray_debug(
-                f"reassert status={key} icon_null={self.tray_icon.icon().isNull()} "
-                f"geometry={g.x()},{g.y()},{g.width()}x{g.height()}"
-            )
-        except Exception:
-            pass
-
-    def _heartbeat_macos_tray(self) -> None:
-        try:
-            if hasattr(self.tray_icon, "reassert"):
-                self.tray_icon.reassert()
-        except Exception:
-            pass
+            badge.show()
+            _tray_debug("macOS badge fallback enabled after tray misses")
+        except Exception as exc:
+            _tray_debug(f"badge fallback failed: {exc}")
 
     def _create_icon(self, color: str) -> QIcon:
         side = 512
@@ -651,7 +953,11 @@ class SystemTrayApp:
                 parts.append(f"Speed: {speed_mbps:.0f} Mbps ({speed_tier.capitalize()})")
         else:
             parts.append("Speed: —")
-        self.tray_icon.setToolTip("\n".join(parts))
+        tip = "\n".join(parts)
+        self.tray_icon.setToolTip(tip)
+        badge = getattr(self, "_macos_menu_badge", None)
+        if badge is not None:
+            badge.setToolTip(tip)
 
     def update_menu_info(self, status) -> None:
         self.status_action.setText(f"{'🟢' if status.status == 'online' else '🟡' if status.status == 'unstable' else '🔴'} {status.status.upper()}")
@@ -675,6 +981,7 @@ class SystemTrayApp:
         else:
             self.speed_action.setText("Speed: —")
 
+    @safe_slot
     def check_connection(self) -> None:
         if self.monitor_thread is not None:
             try:
@@ -699,7 +1006,11 @@ class SystemTrayApp:
             except RuntimeError:
                 pass
 
+    @safe_slot
     def on_status_updated(self, status) -> None:
+        self._on_status_updated_impl(status)
+
+    def _on_status_updated_impl(self, status) -> None:
         self.current_status = status
         if getattr(self, "_splash_closable", False) and not getattr(self, "_splash_closed", True):
             self.close_splash()
@@ -712,7 +1023,12 @@ class SystemTrayApp:
             self.dashboard.update_data(status, self.monitor.get_statistics())
         if self.compact_status:
             self.compact_status.update_status(status)
+        panel = getattr(self, "_macos_control_panel", None)
+        if panel is not None:
+            lat = getattr(status, "avg_latency_ms", None)
+            panel.update_status(status.status, lat)
 
+    @safe_slot
     def _on_speed_test_finished(self) -> None:
         self._speed_test_busy = False
         self.check_connection()
@@ -720,19 +1036,9 @@ class SystemTrayApp:
     def _speed_test_now(self) -> None:
         st_cfg = self.config.get("speed_test", {})
         if not st_cfg.get("enabled", False):
-            self.tray_icon.showMessage(
-                "AMI",
-                "Speed test is disabled in Settings.",
-                QSystemTrayIcon.MessageIcon.Warning,
-                2500,
-            )
+            self._notify_user("AMI", "Speed test is disabled in Settings.", level="warning")
             return
-        self.tray_icon.showMessage(
-            "AMI",
-            "Running download speed test…",
-            QSystemTrayIcon.MessageIcon.Information,
-            2000,
-        )
+        self._notify_user("AMI", "Running download speed test…")
         self._run_speed_test()
 
     def _run_speed_test(self) -> None:
@@ -765,19 +1071,25 @@ class SystemTrayApp:
         threading.Thread(target=run, daemon=True).start()
 
     def manual_test(self) -> None:
-        self.tray_icon.showMessage("AMI", "Running connection test...", QSystemTrayIcon.MessageIcon.Information, 2000)
+        self._notify_user("AMI", "Running connection test...")
         self.check_connection()
 
+    @safe_slot
     def on_tray_activated(self, reason) -> None:
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
             if self.dashboard and self.dashboard.isVisible():
                 self.dashboard.hide()
             else:
-                self.show_dashboard()
+                QTimer.singleShot(0, self._show_dashboard_deferred)
             return
         # macOS: non chiamare popup() qui — `setContextMenu` fa già aprire il menu al click;
         # un secondo popup su Trigger causava due menu sovrapposti.
 
+    @safe_slot
+    def _show_dashboard_deferred(self) -> None:
+        self.show_dashboard()
+
+    @safe_slot
     def show_dashboard(self) -> None:
         if self.dashboard is None:
             from ami.ui.dashboard import EnterpriseDashboard
@@ -794,7 +1106,7 @@ class SystemTrayApp:
             new_cfg = dlg.get_config()
             self.apply_config(new_cfg)
             self.save_config()
-            self.tray_icon.showMessage("AMI Settings", "Settings saved and applied", QSystemTrayIcon.MessageIcon.Information, 2000)
+            self._notify_user("AMI Settings", "Settings saved and applied")
             self.check_connection()
 
     def view_logs(self) -> None:
@@ -815,7 +1127,7 @@ class SystemTrayApp:
         try:
             self.notifier.notify_test()
         except Exception:
-            self.tray_icon.showMessage("AMI", "Test notification", QSystemTrayIcon.MessageIcon.Information, 2000)
+            self._notify_user("AMI", "Test notification")
 
     def check_for_updates(self, manual: bool = False) -> None:
         if not self.updater:
@@ -848,7 +1160,7 @@ class SystemTrayApp:
             self._update_check_busy = False
 
     def show_about(self) -> None:
-        v = html.escape(self.config["app"].get("version", __version__))
+        v = html.escape(_effective_app_version(self.config))
         app = self.config.get("app", {})
         web = (app.get("website") or "https://ciaoim.tech/projects/ami").strip()
         if web and not web.startswith(("http://", "https://")):
@@ -886,15 +1198,27 @@ class SystemTrayApp:
             self.monitor_thread = None
         self.api_server.stop()
         self.tray_icon.hide()
+        if getattr(self, "_macos_menu_badge", None):
+            self._macos_menu_badge.hide()
+        if getattr(self, "_macos_control_panel", None):
+            self._macos_control_panel.hide()
         if getattr(self, "compact_status", None):
             self.compact_status.close()
         self.app.quit()
 
     def run(self) -> int:
+        if sys.platform == "darwin":
+            if getattr(self, "_native_macos_tray", False):
+                QTimer.singleShot(0, self._reassert_macos_tray)
+            badge = getattr(self, "_macos_menu_badge", None)
+            if badge is not None:
+                QTimer.singleShot(100, badge.show)
+                QTimer.singleShot(800, badge.show)
         return self.app.exec()
 
 
 def main() -> None:
+    install_exception_handlers()
     QApplication.setApplicationName("AMI")
     QApplication.setApplicationDisplayName("AMI - Active Monitor of Internet")
     QApplication.setOrganizationName("AMI Project")
