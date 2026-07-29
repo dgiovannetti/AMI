@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 3.2.1
+
+- **Rilevamento online/offline più snappy**: probe fail-fast (timeout corti ping/HTTP), short-circuit se tutti i ping falliscono, check LAN iface-first; ISP/VPN arricchiti **dopo** l’aggiornamento dell’icona tray.
+- **Dashboard chart**: i punti offline/unstable restano visibili (`xlim` aggiornato); storico idratato dal CSV all’avvio; `max_history` portato a 600.
+- **Dashboard UI**: fascia Link continua (uptime-style) al posto dello scatter Status tipo barcode; highlight incidenti sulla curva latenza.
+- **macOS tray menu**: apertura Dashboard corretta con `QAction.triggered(bool)` / `@safe_slot`.
+
 ## 3.2.0
 
 - **macOS tray-only UX**: niente badge flottante sotto la menu bar (interrompeva con `raise` ogni 2 s). Resta **solo l’icona nativa in menu bar** (`NSStatusItem`). Badge opzionale con `AMI_FORCE_BADGE=1`.

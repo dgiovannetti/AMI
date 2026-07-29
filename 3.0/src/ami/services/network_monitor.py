@@ -43,7 +43,8 @@ class NetworkMonitor:
         self.uptime_start = datetime.now()
         self.last_status: Optional[ConnectionStatus] = None
         self.status_history: List[ConnectionStatus] = []
-        self.max_history = 100
+        # ~10 min at 1s poll; keeps offline/unstable visible on the dashboard chart.
+        self.max_history = int(mon.get("max_history", 600))
 
         self._last_public_ip: Optional[str] = None
         self._last_isp_info: Optional[Dict] = None
@@ -53,13 +54,17 @@ class NetworkMonitor:
         self._last_speed_mbps: Optional[float] = None
         self._last_speed_tier: Optional[str] = None
 
+    def _detect_timeout(self) -> int:
+        """Short timeout for online/offline detection (fail-fast)."""
+        return max(1, min(2, int(self.timeout)))
+
     def set_speed_result(self, speed_mbps: Optional[float], tier: Optional[str]) -> None:
         """Update last speed test result (called from speed test thread)."""
         self._last_speed_mbps = speed_mbps
         self._last_speed_tier = tier
 
-    def ping_host(self, host: str, timeout: int = 5) -> PingResult:
-        """Ping a single host (ICMP or TCP fallback)."""
+    def ping_host(self, host: str, timeout: int = 5, *, quick: bool = False) -> PingResult:
+        """Ping a single host (ICMP or TCP fallback). quick=True skips slow ping3 cascade."""
         try:
             if sys.platform == "win32":
                 try:
@@ -78,9 +83,15 @@ class NetworkMonitor:
                     pass
             elif sys.platform in ("darwin", "linux"):
                 try:
-                    timeout_flag = "-W" if sys.platform == "darwin" else "-w"
+                    # macOS -W is milliseconds; Linux -w is seconds.
+                    if sys.platform == "darwin":
+                        wait_arg = str(max(1, int(timeout) * 1000))
+                        timeout_flag = "-W"
+                    else:
+                        wait_arg = str(timeout)
+                        timeout_flag = "-w"
                     result = subprocess.run(
-                        ["ping", "-c", "1", timeout_flag, str(timeout), host],
+                        ["ping", "-c", "1", timeout_flag, wait_arg, host],
                         capture_output=True,
                         text=True,
                         timeout=timeout + 1,
@@ -92,6 +103,7 @@ class NetworkMonitor:
                 except (subprocess.TimeoutExpired, subprocess.SubprocessError, ValueError):
                     pass
 
+            # ping3: keep in quick path (often works when OS ping is blocked) with short timeout.
             try:
                 import ping3
                 ping3.EXCEPTIONS = True
@@ -102,13 +114,16 @@ class NetworkMonitor:
                 pass
 
             tcp_start = time.time()
-            port = 443 if "https" in host or not any(c.isdigit() for c in host) else 80
+            bare = host.replace("https://", "").replace("http://", "").split("/")[0]
             try:
-                ip = socket.gethostbyname(
-                    host.replace("https://", "").replace("http://", "").split("/")[0]
-                )
+                ip = socket.gethostbyname(bare)
             except socket.gaierror:
                 return PingResult(host=host, success=False, error="DNS resolution failed")
+            # Detect path always uses 443; full path keeps legacy port choice for hostnames.
+            if quick:
+                port = 443
+            else:
+                port = 443 if "https" in host or not any(c.isdigit() for c in bare) else 80
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(timeout)
             try:
@@ -116,22 +131,27 @@ class NetworkMonitor:
                 latency = (time.time() - tcp_start) * 1000
                 return PingResult(host=host, success=True, latency_ms=latency)
             except (socket.timeout, socket.error) as e:
-                return PingResult(host=host, success=False, error=f"Connection failed: {str(e)}")
+                return PingResult(host=host, success=False, error=f"Connection failed: {e}")
             finally:
                 sock.close()
         except Exception as e:
             return PingResult(host=host, success=False, error=str(e))
 
-    def test_http_connectivity(self) -> bool:
+    def test_http_connectivity(self, *, fast: bool = True) -> bool:
         """Test HTTP connectivity (primary URL + optional http_test_urls)."""
         if not self.enable_http_test:
             return True
+        # Fail-fast for tray status; speed test uses its own timeouts.
+        if fast:
+            req_timeout: float | tuple[float, float] = (1.5, float(min(2, max(1, int(self.timeout)))))
+        else:
+            req_timeout = float(self.timeout)
         urls = [self.http_test_url] + list(self.http_test_urls)[:5]
         for url in urls:
             if not url or not url.strip():
                 continue
             try:
-                r = requests.get(url.strip(), timeout=self.timeout, allow_redirects=False)
+                r = requests.get(url.strip(), timeout=req_timeout, allow_redirects=False)
                 if r.status_code in (200, 204):
                     return True
             except Exception:
@@ -189,9 +209,15 @@ class NetworkMonitor:
             pass
         return False
 
-    def check_local_network(self) -> bool:
-        """Check if local network is available (gateway or active LAN interface)."""
+    def check_local_network(self, *, fast: bool = False) -> bool:
+        """Check if local network is available (LAN iface first; gateway only if needed)."""
         try:
+            # Instant path: any non-loopback IPv4 interface up.
+            if self._has_active_lan_interface():
+                return True
+            if fast:
+                return False
+
             if sys.platform == "win32":
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(1)
@@ -214,7 +240,7 @@ class NetworkMonitor:
                             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                             sock.settimeout(1)
                             continue
-                    return self._has_active_lan_interface()
+                    return False
                 finally:
                     try:
                         sock.close()
@@ -223,18 +249,19 @@ class NetworkMonitor:
 
             gateway = self._default_gateway()
             if gateway:
-                return self.ping_host(gateway, timeout=2).success
-            return self._has_active_lan_interface()
+                return self.ping_host(gateway, timeout=1).success
+            return False
         except Exception:
             return False
 
     def ping_all_hosts(self) -> List[PingResult]:
-        """Ping all configured hosts in parallel."""
+        """Ping all configured hosts in parallel (fail-fast detect timeout)."""
         results: List[PingResult] = []
         lock = threading.Lock()
+        dt = self._detect_timeout()
 
         def worker(h: str) -> None:
-            result = self.ping_host(h, self.timeout)
+            result = self.ping_host(h, dt, quick=True)
             with lock:
                 results.append(result)
 
@@ -242,7 +269,7 @@ class NetworkMonitor:
         for t in threads:
             t.start()
         for t in threads:
-            t.join(timeout=self.timeout + 1)
+            t.join(timeout=dt + 1)
         return results
 
     def analyze_connection(
@@ -280,30 +307,24 @@ class NetworkMonitor:
         )
 
     def check_connection(self) -> ConnectionStatus:
-        """Perform full connection check (run from worker thread)."""
+        """Perform connection check for tray status (fail-fast; ISP/VPN deferred)."""
         self.total_checks += 1
         if self.internal_test_mode:
             status = self._simulate_connection()
         else:
             ping_results = self.ping_all_hosts()
-            http_ok = self.test_http_connectivity()
-            local_ok = self.check_local_network()
+            success_count = sum(1 for r in ping_results if r.success)
+            if success_count == 0:
+                # Short-circuit offline: no HTTP / gateway ping — LAN iface only.
+                http_ok = False
+                local_ok = self.check_local_network(fast=True)
+            else:
+                http_ok = self.test_http_connectivity(fast=True)
+                local_ok = self.check_local_network(fast=False)
             status = self.analyze_connection(ping_results, http_ok, local_ok)
 
-        if self.total_checks > 1:
-            try:
-                isp_info = self._get_public_network_info()
-                if isp_info:
-                    status.public_ip = isp_info.get("ip")
-                    status.isp = isp_info.get("isp")
-            except Exception:
-                pass
-            try:
-                vpn_connected, vpn_hint = self._detect_vpn(status.isp)
-                status.vpn_connected = vpn_connected
-                status.vpn_provider = vpn_hint
-            except Exception:
-                pass
+        # Apply cached enrichment instantly (no network); refresh happens via enrich_status().
+        self._apply_cached_enrichment(status)
 
         status.speed_mbps = self._last_speed_mbps
         status.speed_tier = self._last_speed_tier
@@ -314,6 +335,90 @@ class NetworkMonitor:
         if len(self.status_history) > self.max_history:
             self.status_history.pop(0)
         self.last_status = status
+        return status
+
+    def seed_history_from_logs(self, rows: List[dict]) -> None:
+        """Hydrate chart history from CSV log rows (keeps offline/unstable across restarts)."""
+        if self.status_history or not rows:
+            return
+        seeded: List[ConnectionStatus] = []
+        for row in rows:
+            raw = (row.get("Status") or row.get("status") or "").strip().lower()
+            if raw not in ("online", "unstable", "offline"):
+                continue
+            lat_raw = row.get("Avg Latency (ms)") or row.get("avg_latency_ms") or "N/A"
+            avg: Optional[float] = None
+            if lat_raw not in ("N/A", "", None):
+                try:
+                    avg = float(lat_raw)
+                except (TypeError, ValueError):
+                    avg = None
+            try:
+                ok_pings = int(row.get("Successful Pings") or row.get("successful_pings") or 0)
+            except (TypeError, ValueError):
+                ok_pings = 0
+            try:
+                total_pings = int(row.get("Total Pings") or row.get("total_pings") or 0)
+            except (TypeError, ValueError):
+                total_pings = 0
+            ts_raw = row.get("Timestamp") or row.get("timestamp")
+            ts = datetime.now()
+            if ts_raw:
+                try:
+                    ts = datetime.strptime(str(ts_raw), "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    pass
+            local_ok = str(row.get("Local Network") or "").strip().lower() in ("yes", "true", "1")
+            internet_ok = str(row.get("Internet OK") or "").strip().lower() in ("yes", "true", "1")
+            http_ok = str(row.get("HTTP Test OK") or "").strip().lower() in ("yes", "true", "1")
+            seeded.append(
+                ConnectionStatus(
+                    status=raw,
+                    avg_latency_ms=avg,
+                    successful_pings=ok_pings,
+                    total_pings=total_pings,
+                    local_network_ok=local_ok,
+                    internet_ok=internet_ok,
+                    http_test_ok=http_ok,
+                    timestamp=ts,
+                )
+            )
+        if not seeded:
+            return
+        self.status_history = seeded[-self.max_history :]
+
+    def _apply_cached_enrichment(self, status: ConnectionStatus) -> None:
+        if self._last_isp_info:
+            status.public_ip = self._last_isp_info.get("ip")
+            status.isp = self._last_isp_info.get("isp")
+        if self._last_vpn_status is not None:
+            status.vpn_connected = self._last_vpn_status[0]
+            status.vpn_provider = self._last_vpn_status[1] or None
+
+    def enrich_status(self, status: ConnectionStatus) -> ConnectionStatus:
+        """
+        ISP/VPN enrichment for tooltip/menu — call after tray icon update.
+        Does not change online/offline/unstable.
+        """
+        if self.total_checks <= 1:
+            return status
+        try:
+            isp_info = self._get_public_network_info()
+            if isp_info:
+                status.public_ip = isp_info.get("ip")
+                status.isp = isp_info.get("isp")
+        except Exception:
+            pass
+        try:
+            vpn_connected, vpn_hint = self._detect_vpn(status.isp)
+            status.vpn_connected = vpn_connected
+            status.vpn_provider = vpn_hint or None
+        except Exception:
+            pass
+        if self.last_status is status or (
+            self.last_status is not None and self.last_status.status == status.status
+        ):
+            self.last_status = status
         return status
 
     def _simulate_connection(self) -> ConnectionStatus:

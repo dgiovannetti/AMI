@@ -295,7 +295,7 @@ Il primo avvio dal .app è più lento che `python -m ami.main` (PyInstaller cari
    Impostazioni → Privacy e sicurezza → scorri fino al messaggio su AMI → «Apri comunque».
    Senza account Apple Developer (firma + notarizzazione) l’avviso può comparire al primo avvio.
 
-ZIP corretto dalla pagina Release: nome file deve contenere «macos», es. AMI-v3.2.0-macos.zip
+ZIP corretto dalla pagina Release: nome file deve contenere «macos», es. AMI-v3.2.1-macos.zip
 (non usare vecchi pacchetti «AMI-macOS.zip» se ancora presenti).
 """,
             encoding="utf-8",

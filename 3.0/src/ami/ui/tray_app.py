@@ -159,6 +159,12 @@ class _SpeedTestDoneBridge(QObject):
     finished = pyqtSignal()
 
 
+class _EnrichDoneBridge(QObject):
+    """ISP/VPN enrichment finished — update tooltip/menu only (icon already set)."""
+
+    finished = pyqtSignal(object)
+
+
 class MonitorThread(QThread):
     status_updated = pyqtSignal(object)
 
@@ -300,6 +306,12 @@ class SystemTrayApp:
         self.monitor = NetworkMonitor(self.config)
         splash_msg("Starting logger...")
         self.logger = EventLogger(self.config)
+        try:
+            self.monitor.seed_history_from_logs(
+                self.logger.get_recent_logs(self.monitor.max_history)
+            )
+        except Exception:
+            pass
         splash_msg("Preparing notifications...")
         self.notifier = Notifier(self.config)
         self.notifier.tray_icon = self.tray_icon
@@ -332,6 +344,9 @@ class SystemTrayApp:
         self._speed_test_busy = False
         self._speed_test_bridge = _SpeedTestDoneBridge(self.app)
         self._speed_test_bridge.finished.connect(self._on_speed_test_finished)
+        self._enrich_bridge = _EnrichDoneBridge(self.app)
+        self._enrich_bridge.finished.connect(self._on_enrich_finished)
+        self._enrich_busy = False
         self.speed_test_timer = None
         st_cfg = self.config.get("speed_test", {})
         if st_cfg.get("enabled", False):
@@ -688,19 +703,19 @@ class SystemTrayApp:
         self.speed_action.setEnabled(False)
         menu.addAction(self.speed_action)
         menu.addSeparator()
-        menu.addAction("📌 Show status window").triggered.connect(self.show_compact_status_window)
-        menu.addAction("🔄 Test Now").triggered.connect(self.manual_test)
-        menu.addAction("⚡ Speed test now").triggered.connect(self._speed_test_now)
-        menu.addAction("📊 Dashboard").triggered.connect(self.show_dashboard)
+        menu.addAction("📌 Show status window").triggered.connect(lambda *_: self.show_compact_status_window())
+        menu.addAction("🔄 Test Now").triggered.connect(lambda *_: self.manual_test())
+        menu.addAction("⚡ Speed test now").triggered.connect(lambda *_: self._speed_test_now())
+        menu.addAction("📊 Dashboard").triggered.connect(lambda *_: self.show_dashboard())
         menu.addSeparator()
-        menu.addAction("⚙️ Settings").triggered.connect(self.show_settings)
-        menu.addAction("📄 View Logs").triggered.connect(self.view_logs)
-        menu.addAction("🔔 Test Notification").triggered.connect(self.test_notification)
+        menu.addAction("⚙️ Settings").triggered.connect(lambda *_: self.show_settings())
+        menu.addAction("📄 View Logs").triggered.connect(lambda *_: self.view_logs())
+        menu.addAction("🔔 Test Notification").triggered.connect(lambda *_: self.test_notification())
         if self.updater:
-            menu.addAction("🔄 Check for Updates").triggered.connect(lambda: self.check_for_updates(True))
+            menu.addAction("🔄 Check for Updates").triggered.connect(lambda *_: self.check_for_updates(True))
         menu.addSeparator()
-        menu.addAction("ℹ️ About").triggered.connect(self.show_about)
-        menu.addAction("❌ Exit").triggered.connect(self.exit_app)
+        menu.addAction("ℹ️ About").triggered.connect(lambda *_: self.show_about())
+        menu.addAction("❌ Exit").triggered.connect(lambda *_: self.exit_app())
         self.tray_icon.setContextMenu(menu)
 
     def _apply_tray_icon_for_status(self, status: str) -> None:
@@ -1015,6 +1030,7 @@ class SystemTrayApp:
         self.current_status = status
         if getattr(self, "_splash_closable", False) and not getattr(self, "_splash_closed", True):
             self.close_splash()
+        # Icon first — never wait for ISP/VPN.
         self.update_icon(status.status)
         self.update_tooltip(status)
         self.update_menu_info(status)
@@ -1028,6 +1044,44 @@ class SystemTrayApp:
         if panel is not None:
             lat = getattr(status, "avg_latency_ms", None)
             panel.update_status(status.status, lat)
+        QTimer.singleShot(0, lambda s=status: self._start_status_enrichment(s))
+
+    def _start_status_enrichment(self, status) -> None:
+        """ISP/VPN in background after icon update (does not delay online/offline)."""
+        if getattr(self, "_enrich_busy", False):
+            return
+        if status is None or getattr(status, "status", None) == "offline":
+            # Still refresh VPN/ISP caches occasionally when offline, but don't block.
+            pass
+        self._enrich_busy = True
+        bridge = self._enrich_bridge
+        monitor = self.monitor
+
+        def work() -> None:
+            enriched = status
+            try:
+                enriched = monitor.enrich_status(status)
+            except Exception:
+                pass
+            finally:
+                bridge.finished.emit(enriched)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    @safe_slot
+    def _on_enrich_finished(self, status) -> None:
+        self._enrich_busy = False
+        if status is None:
+            return
+        # Only refresh metadata if this enrichment is still for the current line state.
+        cur = getattr(self, "current_status", None)
+        if cur is not None and getattr(cur, "status", None) != getattr(status, "status", None):
+            return
+        self.current_status = status
+        self.update_tooltip(status)
+        self.update_menu_info(status)
+        if self.dashboard and self.dashboard.isVisible():
+            self.dashboard.update_data(status, self.monitor.get_statistics())
 
     @safe_slot
     def _on_speed_test_finished(self) -> None:
@@ -1091,15 +1145,26 @@ class SystemTrayApp:
         self.show_dashboard()
 
     @safe_slot
-    def show_dashboard(self) -> None:
+    def show_dashboard(self, *_args) -> None:
+        """Open dashboard. *_args: QAction.triggered / QPushButton.clicked pass a bool."""
         if self.dashboard is None:
             from ami.ui.dashboard import EnterpriseDashboard
             self.dashboard = EnterpriseDashboard(self.config, self.monitor, self.tray_icon)
-        if self.current_status:
-            self.dashboard.update_data(self.current_status, self.monitor.get_statistics())
+        status = self.current_status or self.monitor.last_status
+        if status is not None:
+            self.dashboard.update_data(status, self.monitor.get_statistics())
+        else:
+            self.dashboard.update_graphs()
         self.dashboard.show()
         self.dashboard.raise_()
         self.dashboard.activateWindow()
+        try:
+            if sys.platform == "darwin":
+                from AppKit import NSApplication
+
+                NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+        except Exception:
+            pass
 
     def show_settings(self) -> None:
         dlg = SettingsDialog(self.config)

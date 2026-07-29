@@ -660,32 +660,44 @@ class EnterpriseDashboard(QMainWindow):
 
     def _setup_matplotlib_axes(self) -> None:
         self.figure.clear()
-        self.figure.subplots_adjust(left=0.08, right=0.97, top=0.92, bottom=0.14, hspace=0.42)
         face = "#0c1220" if self._dark else "#faf8f6"
         tick = "#94a3b8" if self._dark else "#57534e"
         grid = "#1e293b" if self._dark else "#e7e5e4"
 
-        self.ax1 = self.figure.add_subplot(211, facecolor=face)
-        self.ax2 = self.figure.add_subplot(212, facecolor=face)
+        # Thin status ribbon on top + latency chart — avoids the dense “barcode” of status dots.
+        gs = self.figure.add_gridspec(
+            2, 1, height_ratios=[0.22, 1.0], left=0.08, right=0.97, top=0.90, bottom=0.12, hspace=0.28
+        )
+        self.ax1 = self.figure.add_subplot(gs[0], facecolor=face)
+        self.ax2 = self.figure.add_subplot(gs[1], facecolor=face, sharex=self.ax1)
+
         for ax in (self.ax1, self.ax2):
-            ax.tick_params(colors=tick, labelsize=9)
             for spine in ax.spines.values():
                 spine.set_visible(False)
-            ax.grid(True, alpha=0.18, color=grid, linestyle="-", linewidth=0.5)
 
-        self.ax1.set_ylim(-0.5, 2.5)
-        self.ax1.set_yticks([0, 1, 2])
-        self.ax1.set_yticklabels(["Off", "Unstable", "On"])
-        self.ax1.set_ylabel("Status", color=tick, fontsize=10, fontweight="600")
+        self.ax1.set_ylim(0, 1)
+        self.ax1.set_yticks([])
+        self.ax1.tick_params(axis="x", labelbottom=False, length=0)
+        self.ax1.set_ylabel("Link", color=tick, fontsize=10, fontweight="600", labelpad=10)
+        self.ax1.grid(False)
+
+        self.ax2.tick_params(colors=tick, labelsize=9)
+        self.ax2.grid(True, alpha=0.18, color=grid, linestyle="-", linewidth=0.5)
         self.ax2.set_ylabel("Latency (ms)", color=tick, fontsize=10, fontweight="600")
 
         c_on = "#2dd4bf" if self._dark else "#0d9488"
         line_c = "#38bdf8" if self._dark else "#2563eb"
-        self._scatter1 = self.ax1.scatter([], [], s=68, alpha=0.92, edgecolors="none", linewidths=0, zorder=3)
-        self._line1, = self.ax1.plot([], [], "-", color="#64748b", alpha=0.28, linewidth=2, zorder=2)
+        self._status_bars = []
+        self._status_legend = None
         self._line2, = self.ax2.plot([], [], "-", color=line_c, linewidth=2.2, antialiased=True, zorder=3)
         self._fill2 = None
-        self._chart_colors = {"on": c_on, "unstable": "#fbbf24", "off": "#f43f5e", "line": line_c}
+        self._incident_spans = []
+        self._chart_colors = {
+            "online": c_on,
+            "unstable": "#fbbf24",
+            "offline": "#f43f5e",
+            "line": line_c,
+        }
 
     def resizeEvent(self, event) -> None:
         w = self.width()
@@ -791,31 +803,149 @@ class EnterpriseDashboard(QMainWindow):
 
         self.update_graphs()
 
+    @staticmethod
+    def _status_runs(statuses: list) -> list:
+        """Collapse consecutive identical statuses into (start, length, status) runs."""
+        if not statuses:
+            return []
+        runs = []
+        start = 0
+        current = statuses[0]
+        for i, st in enumerate(statuses[1:], start=1):
+            if st != current:
+                runs.append((start, i - start, current))
+                start = i
+                current = st
+        runs.append((start, len(statuses) - start, current))
+        return runs
+
+    @staticmethod
+    def _bucket_statuses(statuses: list, max_buckets: int = 120) -> list:
+        """Downsample status history for the ribbon; keep worst status per bucket."""
+        n = len(statuses)
+        if n <= max_buckets:
+            return list(statuses)
+        rank = {"online": 0, "unstable": 1, "offline": 2}
+        out = []
+        for b in range(max_buckets):
+            a = (b * n) // max_buckets
+            z = ((b + 1) * n) // max_buckets
+            chunk = statuses[a:z] or ["online"]
+            out.append(max(chunk, key=lambda s: rank.get(s, 0)))
+        return out
+
     def update_graphs(self) -> None:
         history = getattr(self.monitor, "status_history", [])
         if not history:
             return
-        status_values = [{"online": 2, "unstable": 1, "offline": 0}.get(h.status, 0) for h in history]
-        latencies = [h.avg_latency_ms if h.avg_latency_ms else 0 for h in history]
-        idx = np.arange(len(history), dtype=float)
-        sv = np.array(status_values, dtype=float)
-        lat = np.array(latencies, dtype=float)
-        c_on = self._chart_colors["on"]
-        colors = [
-            c_on if v == 2 else self._chart_colors["unstable"] if v == 1 else self._chart_colors["off"]
-            for v in status_values
+        statuses = [
+            h.status if h.status in ("online", "unstable", "offline") else "offline" for h in history
         ]
-        self._scatter1.set_offsets(np.c_[idx, sv])
-        self._scatter1.set_facecolors(colors)
-        self._line1.set_data(idx, sv)
+        n = len(history)
+        idx = np.arange(n, dtype=float)
+        lat = np.array(
+            [h.avg_latency_ms if h.avg_latency_ms is not None else np.nan for h in history],
+            dtype=float,
+        )
+
+        for artist in getattr(self, "_status_bars", []) or []:
+            try:
+                artist.remove()
+            except Exception:
+                pass
+        self._status_bars = []
+        for artist in getattr(self, "_incident_spans", []) or []:
+            try:
+                artist.remove()
+            except Exception:
+                pass
+        self._incident_spans = []
+
+        ribbon = self._bucket_statuses(statuses)
+        rb = max(len(ribbon), 1)
+        # Continuous online base in sample space (no barcode of teal slices).
+        base = self.ax1.barh(
+            0.5,
+            n,
+            left=-0.5,
+            height=0.58,
+            color=self._chart_colors["online"],
+            alpha=0.40,
+            linewidth=0,
+            align="center",
+            zorder=1,
+        )
+        self._status_bars.extend(base)
+
+        for start, width, st in self._status_runs(ribbon):
+            if st == "online":
+                continue
+            color = self._chart_colors.get(st, self._chart_colors["offline"])
+            x0 = (start * n / rb) - 0.5
+            w = width * n / rb
+            bar = self.ax1.barh(
+                0.5,
+                w,
+                left=x0,
+                height=0.58,
+                color=color,
+                alpha=0.95,
+                linewidth=0,
+                align="center",
+                zorder=2,
+            )
+            self._status_bars.extend(bar)
+            span = self.ax2.axvspan(
+                x0,
+                x0 + w,
+                color=color,
+                alpha=0.11 if st == "unstable" else 0.15,
+                linewidth=0,
+                zorder=1,
+            )
+            self._incident_spans.append(span)
+
+        if getattr(self, "_status_legend", None) is None:
+            from matplotlib.patches import Patch
+
+            self._status_legend = self.ax1.legend(
+                handles=[
+                    Patch(facecolor=self._chart_colors["online"], edgecolor="none", label="Online"),
+                    Patch(facecolor=self._chart_colors["unstable"], edgecolor="none", label="Unstable"),
+                    Patch(facecolor=self._chart_colors["offline"], edgecolor="none", label="Offline"),
+                ],
+                loc="upper right",
+                fontsize=8,
+                frameon=False,
+                ncol=3,
+                handlelength=0.9,
+                columnspacing=0.8,
+                borderaxespad=0.2,
+                labelcolor="#94a3b8" if self._dark else "#57534e",
+            )
+
         self._line2.set_data(idx, lat)
         if self._fill2 is not None:
             try:
                 self._fill2.remove()
             except Exception:
                 pass
-        lc = self._chart_colors["line"]
-        self._fill2 = self.ax2.fill_between(idx, lat, alpha=0.18, color=lc, zorder=2)
+        self._fill2 = self.ax2.fill_between(
+            idx,
+            lat,
+            where=np.isfinite(lat),
+            alpha=0.14,
+            color=self._chart_colors["line"],
+            interpolate=False,
+            zorder=2,
+        )
+
+        x_right = max(n - 1, 1) + 0.5
+        self.ax1.set_xlim(-0.5, x_right)
+        self.ax2.set_xlim(-0.5, x_right)
+        finite = lat[np.isfinite(lat)]
+        lat_max = float(np.max(finite)) if finite.size else 0.0
+        self.ax2.set_ylim(0, max(lat_max * 1.15, 10.0))
         self.canvas.draw_idle()
 
     def refresh_data(self) -> None:

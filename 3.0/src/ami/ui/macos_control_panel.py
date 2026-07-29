@@ -92,7 +92,8 @@ class MacOSControlPanel(QDialog):
 
     def set_dashboard_callback(self, cb) -> None:
         self._dashboard_cb = cb
-        self._dash_btn.clicked.connect(cb)
+        # clicked passes checked:bool — wrap so cb can be zero-arg / safe_slot.
+        self._dash_btn.clicked.connect(lambda *_: cb())
 
     def show_centered(self) -> None:
         app = QApplication.instance()
