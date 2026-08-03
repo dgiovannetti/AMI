@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 3.2.2
+
+- **Windows stability**: ping.exe locale-agnostic (`durata=`/`Zeit=`/`temps=`/…); no ping3/DNS cascade after a conclusive `ping.exe` result.
+- **Windows tray GDI**: cache `QIcon` and call `setIcon` only when status color changes.
+- **Monitor worker**: reuse a single background check + Qt signal bridge (no new `QThread` every poll).
+- **Dashboard**: pause matplotlib refresh while hidden; skip redraw when history fingerprint unchanged.
+- **Diagnostics**: crash/quit logs under user data dir (`ami-crash.log` / `ami-quit.log`), announced on Windows startup.
+
 ## 3.2.1
 
 - **Rilevamento online/offline più snappy**: probe fail-fast (timeout corti ping/HTTP), short-circuit se tutti i ping falliscono, check LAN iface-first; ISP/VPN arricchiti **dopo** l’aggiornamento dell’icona tray.

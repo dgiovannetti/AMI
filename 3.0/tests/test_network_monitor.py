@@ -1,7 +1,7 @@
 """Tests for network status analysis and local network helpers."""
 
 from ami.core.models import PingResult
-from ami.services.network_monitor import NetworkMonitor
+from ami.services.network_monitor import NetworkMonitor, parse_ping_latency_ms
 
 
 def _monitor(**overrides) -> NetworkMonitor:
@@ -228,3 +228,101 @@ def test_seed_history_from_logs_keeps_offline_and_unstable():
 def test_default_max_history_is_long_enough_for_chart():
     mon = _monitor()
     assert mon.max_history >= 600
+
+
+def test_parse_ping_latency_ms_english():
+    out = "Reply from 8.8.8.8: bytes=32 time=24ms TTL=117"
+    assert parse_ping_latency_ms(out) == 24.0
+
+
+def test_parse_ping_latency_ms_italian():
+    out = "Risposta da 8.8.8.8: byte=32 durata=18ms TTL=117"
+    assert parse_ping_latency_ms(out) == 18.0
+
+
+def test_parse_ping_latency_ms_german():
+    out = "Antwort von 8.8.8.8: Bytes=32 Zeit=22ms TTL=117"
+    assert parse_ping_latency_ms(out) == 22.0
+
+
+def test_parse_ping_latency_ms_french():
+    out = "Réponse de 8.8.8.8 : octets=32 temps=15 ms TTL=117"
+    assert parse_ping_latency_ms(out) == 15.0
+
+
+def test_parse_ping_latency_ms_sub_ms():
+    out = "Reply from 127.0.0.1: bytes=32 time<1ms TTL=128"
+    assert parse_ping_latency_ms(out) == 1.0
+
+
+def test_windows_ping_success_without_english_time(monkeypatch):
+    """Localized Windows ping returncode=0 must not fall through to ping3/DNS."""
+    import subprocess
+    import sys
+
+    if sys.platform != "win32":
+        # Simulate win32 branch of ping_host.
+        monkeypatch.setattr(sys, "platform", "win32")
+
+    mon = _monitor()
+    calls = {"ping3": 0}
+
+    class FakeCompleted:
+        returncode = 0
+        stdout = "Risposta da 8.8.8.8: byte=32 durata=21ms TTL=117"
+        stderr = ""
+
+    def fake_run(*args, **kwargs):
+        return FakeCompleted()
+
+    def boom_ping3(*args, **kwargs):
+        calls["ping3"] += 1
+        raise AssertionError("ping3 must not run after successful ping.exe")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0, raising=False)
+    import types
+
+    fake_mod = types.ModuleType("ping3")
+    fake_mod.EXCEPTIONS = False
+    fake_mod.ping = boom_ping3
+    monkeypatch.setitem(__import__("sys").modules, "ping3", fake_mod)
+
+    # Ensure CREATE_NO_WINDOW exists for the call site.
+    if not hasattr(subprocess, "CREATE_NO_WINDOW"):
+        monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0, raising=False)
+
+    result = mon.ping_host("8.8.8.8", timeout=2, quick=True)
+    assert result.success is True
+    assert result.latency_ms == 21.0
+    assert calls["ping3"] == 0
+
+
+def test_windows_ping_failure_skips_cascade(monkeypatch):
+    import subprocess
+    import sys
+    import types
+
+    monkeypatch.setattr(sys, "platform", "win32")
+    mon = _monitor()
+
+    class FakeCompleted:
+        returncode = 1
+        stdout = "Richiesta scaduta."
+        stderr = ""
+
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: FakeCompleted())
+    if not hasattr(subprocess, "CREATE_NO_WINDOW"):
+        monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0, raising=False)
+
+    def boom_ping3(*args, **kwargs):
+        raise AssertionError("ping3 must not run after ping.exe failure")
+
+    fake_mod = types.ModuleType("ping3")
+    fake_mod.EXCEPTIONS = False
+    fake_mod.ping = boom_ping3
+    monkeypatch.setitem(sys.modules, "ping3", fake_mod)
+
+    result = mon.ping_host("8.8.8.8", timeout=2, quick=True)
+    assert result.success is False
+    assert result.error == "ping failed"

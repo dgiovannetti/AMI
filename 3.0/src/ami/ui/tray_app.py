@@ -9,7 +9,7 @@ import threading
 import time
 from pathlib import Path
 
-from PyQt6.QtCore import QObject, QTimer, Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QObject, QTimer, Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QColor, QCursor, QIcon, QImage, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
@@ -29,7 +29,7 @@ from ami.services.speed_test import run_speed_test
 from ami.services.startup import sync_autostart
 from ami.services.updater import UpdateManager
 from ami.ui.compact_status import CompactStatusWindow
-from ami.ui.qt_safe import install_exception_handlers, safe_slot
+from ami.ui.qt_safe import announce_crash_log_path, install_exception_handlers, quit_log_path, safe_slot
 from ami.ui.settings_dialog import SettingsDialog
 from ami.ui.splash_screen import UltraModernSplashScreen
 from ami.ui.update_dialog import UpdateDialog
@@ -58,7 +58,9 @@ def _log_ami_quit() -> None:
     try:
         from datetime import datetime, timezone
 
-        with open("/tmp/ami-quit.log", "a", encoding="utf-8") as f:
+        path = quit_log_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
             f.write(f"{datetime.now(timezone.utc).isoformat()} aboutToQuit\n")
     except OSError:
         pass
@@ -165,21 +167,10 @@ class _EnrichDoneBridge(QObject):
     finished = pyqtSignal(object)
 
 
-class MonitorThread(QThread):
-    status_updated = pyqtSignal(object)
+class _MonitorDoneBridge(QObject):
+    """Connection check finished — status delivered on GUI thread (QueuedConnection)."""
 
-    def __init__(self, monitor: NetworkMonitor):
-        super().__init__()
-        self.monitor = monitor
-        self.running = True
-
-    def run(self) -> None:
-        if self.running:
-            status = self.monitor.check_connection()
-            self.status_updated.emit(status)
-
-    def stop(self) -> None:
-        self.running = False
+    finished = pyqtSignal(object)
 
 
 class SystemTrayApp:
@@ -205,8 +196,10 @@ class SystemTrayApp:
         app_version = _effective_app_version(self.config)
         use_compact = _effective_compact_status_window(self.config)
         sync_autostart(self.config.get("startup", {}).get("auto_start", False))
-        # Cache icone tray macOS (template da PNG per path)
+        # Cache icone tray (macOS template + Windows GDI-friendly reuse)
         self._macos_tray_icon_cache: dict[str, QIcon] = {}
+        self._tray_icon_cache: dict[str, QIcon] = {}
+        self._last_tray_status: str | None = None
 
         self.updater = None
         self.update_timer = None
@@ -318,11 +311,22 @@ class SystemTrayApp:
         splash_msg("Starting API server...")
         self.api_server = APIServer(self.config, self.monitor)
         self.current_status = None
-        self.monitor_thread = None
+        self._monitor_busy = False
         splash_msg("Finalizing...")
         if self.splash:
             _process_init_events(self.app)
         self.api_server.start()
+        if sys.platform == "win32":
+            announce_crash_log_path()
+        self.dashboard = None
+        self._speed_test_busy = False
+        self._speed_test_bridge = _SpeedTestDoneBridge(self.app)
+        self._speed_test_bridge.finished.connect(self._on_speed_test_finished)
+        self._enrich_bridge = _EnrichDoneBridge(self.app)
+        self._enrich_bridge.finished.connect(self._on_enrich_finished)
+        self._enrich_busy = False
+        self._monitor_bridge = _MonitorDoneBridge(self.app)
+        self._monitor_bridge.finished.connect(self._on_monitor_finished)
         self.update_icon("offline")
         interval = self.config["monitoring"]["polling_interval"] * 1000
         self.timer = QTimer()
@@ -340,13 +344,6 @@ class SystemTrayApp:
             self._macos_compact_keepalive.timeout.connect(self._ensure_macos_compact_visible)
             self._macos_compact_keepalive.start(5000)
         self.check_connection()
-        self.dashboard = None
-        self._speed_test_busy = False
-        self._speed_test_bridge = _SpeedTestDoneBridge(self.app)
-        self._speed_test_bridge.finished.connect(self._on_speed_test_finished)
-        self._enrich_bridge = _EnrichDoneBridge(self.app)
-        self._enrich_bridge.finished.connect(self._on_enrich_finished)
-        self._enrich_busy = False
         self.speed_test_timer = None
         st_cfg = self.config.get("speed_test", {})
         if st_cfg.get("enabled", False):
@@ -740,7 +737,13 @@ class SystemTrayApp:
         if sys.platform == "darwin":
             return self._macos_tray_icon_from_status_png(path, color_key)
         if path.exists():
-            return QIcon(str(path))
+            key = os.fspath(path.resolve()) if path.is_file() else str(path)
+            cached = self._tray_icon_cache.get(key)
+            if cached is not None and not cached.isNull():
+                return cached
+            icon = QIcon(str(path))
+            self._tray_icon_cache[key] = icon
+            return icon
         return self._create_icon(color_key)
 
     def _macos_tray_icon_from_status_png(self, path: Path, color_key: str) -> QIcon:
@@ -949,6 +952,10 @@ class SystemTrayApp:
         return QIcon(pixmap)
 
     def update_icon(self, status: str) -> None:
+        # Avoid GDI/USER churn on Windows: only push a new icon when the color changes.
+        if status == getattr(self, "_last_tray_status", None):
+            return
+        self._last_tray_status = status
         self._apply_tray_icon_for_status(status)
 
     def update_tooltip(self, status) -> None:
@@ -999,28 +1006,29 @@ class SystemTrayApp:
 
     @safe_slot
     def check_connection(self) -> None:
-        if self.monitor_thread is not None:
-            try:
-                if self.monitor_thread.isRunning():
-                    return
-            except RuntimeError:
-                self.monitor_thread = None
-        self.monitor_thread = MonitorThread(self.monitor)
-        self.monitor_thread.status_updated.connect(self.on_status_updated)
-        self.monitor_thread.finished.connect(self.on_monitor_thread_finished)
-        self.monitor_thread.start()
+        if getattr(self, "_monitor_busy", False):
+            return
+        self._monitor_busy = True
+        bridge = self._monitor_bridge
+        monitor = self.monitor
 
-    def on_monitor_thread_finished(self) -> None:
-        try:
-            thread = self.sender()
-        except Exception:
-            thread = None
-        self.monitor_thread = None
-        if thread is not None:
+        def work() -> None:
+            status = None
             try:
-                thread.deleteLater()
-            except RuntimeError:
-                pass
+                status = monitor.check_connection()
+            except Exception:
+                status = None
+            finally:
+                bridge.finished.emit(status)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    @safe_slot
+    def _on_monitor_finished(self, status) -> None:
+        self._monitor_busy = False
+        if status is None:
+            return
+        self.on_status_updated(status)
 
     @safe_slot
     def on_status_updated(self, status) -> None:
@@ -1255,13 +1263,11 @@ class SystemTrayApp:
             self.update_timer.stop()
         if getattr(self, "speed_test_timer", None):
             self.speed_test_timer.stop()
-        if self.monitor_thread is not None:
-            try:
-                if self.monitor_thread.isRunning():
-                    self.monitor_thread.wait(3000)
-            except RuntimeError:
-                pass
-            self.monitor_thread = None
+        # Wait briefly if a background check is in flight (daemon thread exits with process).
+        deadline = time.monotonic() + 3.0
+        while getattr(self, "_monitor_busy", False) and time.monotonic() < deadline:
+            self.app.processEvents()
+            time.sleep(0.05)
         self.api_server.stop()
         self.tray_icon.hide()
         if getattr(self, "_macos_menu_badge", None):

@@ -197,9 +197,10 @@ class EnterpriseDashboard(QMainWindow):
         self.setStyleSheet(get_stylesheet(theme) + self._dashboard_chrome_qss())
         self.setup_ui()
 
+        self._graph_fingerprint = None
         self.refresh_timer = QTimer()
         self.refresh_timer.timeout.connect(self.refresh_data)
-        self.refresh_timer.start(5000)
+        # Started on show; paused while hidden to avoid QtAgg churn on Windows.
 
         self._github_stars_timer = QTimer()
         self._github_stars_timer.timeout.connect(self._fetch_github_stars)
@@ -835,6 +836,8 @@ class EnterpriseDashboard(QMainWindow):
         return out
 
     def update_graphs(self) -> None:
+        if not self.isVisible():
+            return
         history = getattr(self.monitor, "status_history", [])
         if not history:
             return
@@ -842,6 +845,16 @@ class EnterpriseDashboard(QMainWindow):
             h.status if h.status in ("online", "unstable", "offline") else "offline" for h in history
         ]
         n = len(history)
+        last = history[-1]
+        fingerprint = (
+            n,
+            last.status,
+            last.avg_latency_ms,
+            getattr(last, "timestamp", None),
+        )
+        if fingerprint == getattr(self, "_graph_fingerprint", None):
+            return
+        self._graph_fingerprint = fingerprint
         idx = np.arange(n, dtype=float)
         lat = np.array(
             [h.avg_latency_ms if h.avg_latency_ms is not None else np.nan for h in history],
@@ -949,12 +962,29 @@ class EnterpriseDashboard(QMainWindow):
         self.canvas.draw_idle()
 
     def refresh_data(self) -> None:
+        if not self.isVisible():
+            return
         if self.monitor.last_status:
             self.update_data(self.monitor.last_status, self.monitor.get_statistics())
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if getattr(self, "refresh_timer", None) is not None and not self.refresh_timer.isActive():
+            self.refresh_timer.start(5000)
+        # Force a chart refresh when reopened (fingerprint may skip otherwise).
+        self._graph_fingerprint = None
+        QTimer.singleShot(0, self.refresh_data)
+
+    def hideEvent(self, event) -> None:
+        if getattr(self, "refresh_timer", None) is not None:
+            self.refresh_timer.stop()
+        super().hideEvent(event)
 
     def closeEvent(self, event) -> None:
         if self.tray_icon and self.tray_icon.isVisible():
             event.ignore()
             self.hide()
         else:
+            if getattr(self, "refresh_timer", None) is not None:
+                self.refresh_timer.stop()
             event.accept()

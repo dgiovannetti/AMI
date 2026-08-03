@@ -1,7 +1,7 @@
 """
 AMI 3.0 - Network monitoring engine.
 Multi-host ping (parallel threads), HTTP test(s), connection status, statistics.
-Optional multiple http_test_urls; runs in thread (call check_connection from MonitorThread).
+Optional multiple http_test_urls; call check_connection from a background worker.
 """
 
 import re
@@ -17,6 +17,26 @@ import psutil
 import requests
 
 from ami.core.models import ConnectionStatus, PingResult
+
+# Windows ping.exe localizes "time="; also accept time<1ms.
+_PING_LATENCY_RE = re.compile(
+    r"(?:time|durata|zeit|temps|tiempo)\s*[=<]\s*([\d.,]+)\s*ms",
+    re.IGNORECASE,
+)
+
+
+def parse_ping_latency_ms(stdout: str) -> Optional[float]:
+    """Extract RTT ms from OS ping stdout (EN/IT/DE/FR/ES)."""
+    if not stdout:
+        return None
+    m = _PING_LATENCY_RE.search(stdout)
+    if not m:
+        return None
+    raw = m.group(1).replace(",", ".")
+    try:
+        return float(raw)
+    except ValueError:
+        return None
 
 
 class NetworkMonitor:
@@ -64,8 +84,9 @@ class NetworkMonitor:
         self._last_speed_tier = tier
 
     def ping_host(self, host: str, timeout: int = 5, *, quick: bool = False) -> PingResult:
-        """Ping a single host (ICMP or TCP fallback). quick=True skips slow ping3 cascade."""
+        """Ping a single host (ICMP or TCP fallback). quick=True uses short detect timeouts."""
         try:
+            # Windows: trust ping.exe outcome; do not cascade into ping3/DNS if it ran.
             if sys.platform == "win32":
                 try:
                     result = subprocess.run(
@@ -75,11 +96,17 @@ class NetworkMonitor:
                         creationflags=subprocess.CREATE_NO_WINDOW,
                         timeout=timeout + 1,
                     )
-                    if result.returncode == 0 and "time=" in result.stdout.lower():
-                        time_str = result.stdout.lower().split("time=")[1].split()[0]
-                        latency = float(time_str.replace("ms", ""))
+                    latency = parse_ping_latency_ms(result.stdout or "")
+                    if result.returncode == 0:
                         return PingResult(host=host, success=True, latency_ms=latency)
-                except (subprocess.TimeoutExpired, subprocess.SubprocessError, ValueError):
+                    return PingResult(
+                        host=host,
+                        success=False,
+                        error="ping failed",
+                        latency_ms=latency,
+                    )
+                except (subprocess.TimeoutExpired, subprocess.SubprocessError, ValueError, OSError):
+                    # ping.exe missing / killed — fall through to ping3/TCP.
                     pass
             elif sys.platform in ("darwin", "linux"):
                 try:
@@ -96,14 +123,13 @@ class NetworkMonitor:
                         text=True,
                         timeout=timeout + 1,
                     )
-                    if result.returncode == 0 and "time=" in result.stdout:
-                        time_str = result.stdout.split("time=")[1].split()[0]
-                        latency = float(time_str.replace("ms", ""))
+                    latency = parse_ping_latency_ms(result.stdout or "")
+                    if result.returncode == 0:
                         return PingResult(host=host, success=True, latency_ms=latency)
-                except (subprocess.TimeoutExpired, subprocess.SubprocessError, ValueError):
+                except (subprocess.TimeoutExpired, subprocess.SubprocessError, ValueError, OSError):
                     pass
 
-            # ping3: keep in quick path (often works when OS ping is blocked) with short timeout.
+            # ping3 / TCP: used when OS ping is unavailable (or non-Windows soft-fail).
             try:
                 import ping3
                 ping3.EXCEPTIONS = True

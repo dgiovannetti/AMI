@@ -17,7 +17,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "app": {
         "name": "AMI",
         "subtitle": "Active Monitor of Internet",
-        "version": "3.2.1",
+        "version": "3.2.2",
         "copyright": "© 2025–2026 CiaoIM™ by Daniel Giovannetti",
         "website": "https://ciaoim.tech/projects/ami",
         "tagline": "Crafted logic. Measured force. Front-end vision, compiled systems, and hardcoded ethics.",
@@ -129,7 +129,7 @@ def _migrate_from_2x(config: Dict[str, Any]) -> Dict[str, Any]:
     except (ValueError, IndexError):
         major = 0
     if major < 3:
-        app["version"] = "3.2.1"
+        app["version"] = "3.2.2"
     if app.get("website") in ("ciaoim.tech", "www.ciaoim.tech"):
         app["website"] = "https://ciaoim.tech/projects/ami"
     if app.get("copyright") == "© 2025 CiaoIM™ by Daniel Giovannetti":
@@ -193,7 +193,7 @@ def load_config() -> Dict[str, Any]:
 
     config = _migrate_from_2x(raw)
     _validate_config(config)
-    # Salva migrazioni (es. app.version 2.x → 3.2.1) così OTA/About non restano obsoleti.
+    # Salva migrazioni (es. app.version 2.x → 3.2.2) così OTA/About non restano obsoleti.
     try:
         if json.dumps(raw, sort_keys=True) != json.dumps(config, sort_keys=True):
             save_config(config)

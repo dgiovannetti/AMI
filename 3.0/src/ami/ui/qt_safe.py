@@ -1,5 +1,6 @@
 """
 Guards against PyQt6 slot exceptions aborting the process (qFatal/SIGABRT on macOS).
+Crash/diagnostic logs go to the user data dir (readable on Windows).
 """
 
 from __future__ import annotations
@@ -8,12 +9,53 @@ import functools
 import sys
 import traceback
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, TypeVar
 
 F = TypeVar("F", bound=Callable[..., Any])
 
-_CRASH_LOG = "/tmp/ami-crash.log"
 _installed = False
+_crash_log_path: Path | None = None
+_announced = False
+
+
+def crash_log_path() -> Path:
+    """Path to ami-crash.log under the user data directory."""
+    global _crash_log_path
+    if _crash_log_path is not None:
+        return _crash_log_path
+    try:
+        from ami.core.paths import get_user_data_dir
+
+        base = get_user_data_dir()
+        base.mkdir(parents=True, exist_ok=True)
+        _crash_log_path = base / "ami-crash.log"
+    except Exception:
+        # Last resort if platformdirs / paths fail at import time.
+        if sys.platform == "win32":
+            fallback = Path.home() / "AppData" / "Local" / "CiaoIM" / "AMI"
+        else:
+            fallback = Path("/tmp")
+        try:
+            fallback.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            fallback = Path.home()
+        _crash_log_path = fallback / "ami-crash.log"
+    return _crash_log_path
+
+
+def quit_log_path() -> Path:
+    """Path to ami-quit.log next to the crash log."""
+    return crash_log_path().with_name("ami-quit.log")
+
+
+def _append_log(path: Path, text: str) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(text)
+    except OSError:
+        pass
 
 
 def _log_exception(context: str, exc: BaseException | None = None) -> None:
@@ -25,10 +67,18 @@ def _log_exception(context: str, exc: BaseException | None = None) -> None:
         print(f"[AMI] {context}: {exc or 'see traceback'}", file=sys.stderr, flush=True)
     except Exception:
         pass
+    _append_log(crash_log_path(), line)
+
+
+def announce_crash_log_path() -> None:
+    """Print crash log location once (so Windows testers know where to look)."""
+    global _announced
+    if _announced:
+        return
+    _announced = True
     try:
-        with open(_CRASH_LOG, "a", encoding="utf-8") as f:
-            f.write(line)
-    except OSError:
+        print(f"[AMI] Crash log: {crash_log_path()}", file=sys.stderr, flush=True)
+    except Exception:
         pass
 
 
@@ -38,16 +88,17 @@ def install_exception_handlers() -> None:
     if _installed:
         return
     _installed = True
+    announce_crash_log_path()
 
     prev = sys.excepthook
 
     def _excepthook(etype, value, tb) -> None:
         try:
             text = "".join(traceback.format_exception(etype, value, tb))
-            with open(_CRASH_LOG, "a", encoding="utf-8") as f:
-                f.write(
-                    f"{datetime.now(timezone.utc).isoformat()} [sys.excepthook]\n{text}\n"
-                )
+            _append_log(
+                crash_log_path(),
+                f"{datetime.now(timezone.utc).isoformat()} [sys.excepthook]\n{text}\n",
+            )
             print(f"[AMI] Uncaught exception:\n{text}", file=sys.stderr, flush=True)
         except Exception:
             pass
@@ -76,8 +127,7 @@ def install_exception_handlers() -> None:
                 line = (
                     f"{datetime.now(timezone.utc).isoformat()} [Qt/{level}] {message}\n"
                 )
-                with open(_CRASH_LOG, "a", encoding="utf-8") as f:
-                    f.write(line)
+                _append_log(crash_log_path(), line)
                 if mode in (QtMsgType.QtCriticalMsg, QtMsgType.QtFatalMsg):
                     print(f"[AMI Qt {level}] {message}", file=sys.stderr, flush=True)
             except Exception:

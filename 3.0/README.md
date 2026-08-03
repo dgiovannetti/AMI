@@ -11,7 +11,7 @@ AMI 3.0 is a cross-platform desktop app that monitors internet connectivity in r
 - **API**: Optional Bearer token for `/status`, `/health`, `/stats` endpoints.
 - **Monitor**: Optional multiple HTTP test URLs; same multi-host ping and thresholds.
 - **Settings**: New API tab (enable/port/auth token); theme selector; validation and defaults.
-- **Single source of version**: `ami.__version__` (e.g. **3.2.1**) used by app and OTA.
+- **Single source of version**: `ami.__version__` (e.g. **3.2.2**) used by app and OTA.
 
 ## Requirements
 
