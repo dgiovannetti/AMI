@@ -42,6 +42,7 @@ class UpdateManager:
         self.postpone_file = Path.home() / ".ami_update_postponed"
         self.max_postponements = max_postponements
         self.token = os.environ.get("AMI_GITHUB_TOKEN") or os.environ.get("GITHUB_TOKEN")
+        self.last_download_error: Optional[str] = None
         self.base_headers = {"Accept": "application/vnd.github+json"}
         if self.token:
             self.base_headers["Authorization"] = f"Bearer {self.token}"
@@ -139,17 +140,40 @@ class UpdateManager:
     def can_postpone(self) -> bool:
         return self.get_postpone_count() < self.max_postponements
 
+    @staticmethod
+    def _accepted_checksum(checksum: Optional[str]) -> Optional[str]:
+        """64-char hex SHA256, or None if missing/malformed (fail-closed)."""
+        if checksum is None:
+            return None
+        cs = str(checksum).strip()
+        if len(cs) == 64 and all(c in "0123456789abcdefABCDEF" for c in cs):
+            return cs.lower()
+        return None
+
+    def _refuse_download(self, download_path: Path, message: str) -> None:
+        download_path.unlink(missing_ok=True)
+        print(f"[UPDATE] {message}", file=sys.stderr)
+        self.last_download_error = message
+
     def download_update(
         self,
         download_url: str,
         checksum: Optional[str] = None,
         progress_callback: Optional[Callable[[int], None]] = None,
     ) -> Optional[Path]:
+        self.last_download_error = None
         try:
             temp_dir = Path(tempfile.gettempdir()) / "ami_update"
             temp_dir.mkdir(exist_ok=True)
             filename = download_url.split("/")[-1].split("?")[0] or "update.zip"
             download_path = temp_dir / filename
+            expected = self._accepted_checksum(checksum)
+            if expected is None:
+                self._refuse_download(
+                    download_path,
+                    "Checksum missing or invalid; update refused",
+                )
+                return None
             headers = {}
             if self.token:
                 headers["Authorization"] = f"Bearer {self.token}"
@@ -186,14 +210,9 @@ class UpdateManager:
                     progress_callback(100)
                 except Exception:
                     pass
-            if checksum:
-                cs = checksum.strip()
-                if len(cs) == 64 and all(c in "0123456789abcdefABCDEF" for c in cs):
-                    if not self._verify_checksum(download_path, cs):
-                        download_path.unlink(missing_ok=True)
-                        return None
-                else:
-                    print("[UPDATE] Checksum in release notes invalid or missing; skipping verify")
+            if not self._verify_checksum(download_path, expected):
+                self._refuse_download(download_path, "Checksum mismatch; update refused")
+                return None
             return download_path
         except Exception as e:
             print(f"[UPDATE] Download failed: {e}")

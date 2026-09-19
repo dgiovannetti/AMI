@@ -11,7 +11,7 @@ AMI 3.0 is a cross-platform desktop app that monitors internet connectivity in r
 - **API**: Optional Bearer token for `/status`, `/health`, `/stats` endpoints.
 - **Monitor**: Optional multiple HTTP test URLs; same multi-host ping and thresholds.
 - **Settings**: New API tab (enable/port/auth token); theme selector; validation and defaults.
-- **Single source of version**: `ami.__version__` (e.g. **3.2.2**) used by app and OTA.
+- **Single source of version**: `ami.__version__` (e.g. **3.3.0**) used by app and OTA.
 
 ## Requirements
 
@@ -38,12 +38,13 @@ Assicurati che `config.json` e `config.schema.json` siano in `3.0/`. Le icone so
 
 Key options:
 
-- `monitoring.ping_hosts`, `http_test_url`, `http_test_urls` (optional), `polling_interval`, `timeout`, `enable_http_test`
+- `monitoring.ping_hosts`, `http_test_url`, `http_test_urls` (optional), `polling_interval`, `timeout`, `retry_count` (extra attempts after a failed probe; `0` is fail-fast), `enable_http_test`
 - `thresholds.unstable_latency_ms`, `unstable_loss_percent`
 - `notifications.enabled`, `silent_mode`, `notify_on_disconnect`, `notify_on_reconnect`, `notify_on_unstable`
 - `logging.enabled`, `log_file`, `max_log_size_mb`
 - `api.enabled`, `api.port`, `api.auth_token` (optional)
 - `ui.theme` (`auto` | `light` | `dark`), `show_dashboard_on_start`, `compact_status_window`
+- `privacy.lookup_public_network`: when true, AMI asks ipinfo.io / ipapi.co / ifconfig.co for public IP and ISP. Default is true. An explicit false is kept.
 - `updates.enabled`, `check_on_startup`, `check_interval_hours`, `github_repo`, `max_postponements`
 - `speed_test` (enabled, interval, `test_url`, `download_size_mb`, `warmup_mb`, `timeout_seconds`, tier Mbps thresholds): timed window after optional warmup; `test_url` should serve at least **warmup + download** bytes. Default is Hetzner **FSN1** (`https://fsn1-speed.hetzner.com/100MB.bin`); other regions use the same path on `nbg1-speed`, `hel1-speed`, `ash-speed`, `hil-speed`, `sin-speed` (the old `speed.hetzner.de` host is deprecated). If the primary URL fails, AMI tries built-in fallback mirrors automatically.
 

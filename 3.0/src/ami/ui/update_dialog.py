@@ -48,7 +48,9 @@ class UpdateDownloadThread(QThread):
                 progress_callback=report,
             )
             if not path:
-                self.error.emit("Failed to download update")
+                self.error.emit(
+                    self.updater.last_download_error or "Failed to download update"
+                )
                 self.finished.emit(False)
                 return
             self.progress.emit(100)

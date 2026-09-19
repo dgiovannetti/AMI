@@ -12,8 +12,9 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ami.core.models import reason_text
 from ami.core.paths import get_base_path
-from ami.ui.themes import resolve_theme
+from ami.ui.themes import palette, status_color
 
 
 class CompactStatusWindow(QFrame):
@@ -28,40 +29,42 @@ class CompactStatusWindow(QFrame):
         self.setWindowTitle("AMI")
         flags = Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint
         self.setWindowFlags(flags)
-        self.setFixedSize(180, 140)
+        self.setFixedWidth(220)
 
         theme = config.get("ui", {}).get("theme", "auto")
-        self._dark = resolve_theme(theme) == "dark"
+        self._pal = palette(theme)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(self._shell_qss())
 
         lay = QVBoxLayout(self)
-        lay.setSpacing(2)
+        lay.setSpacing(4)
         lay.setContentsMargins(16, 14, 16, 12)
 
         title = QLabel("AMI")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setFont(QFont("Helvetica Neue", 12, QFont.Weight.Bold))
-        title.setStyleSheet(self._lbl_qss("#94a3b8" if self._dark else "#57534e"))
+        title.setFont(QFont("Helvetica Neue", 11, QFont.Weight.DemiBold))
+        title.setStyleSheet(self._lbl_qss(self._pal.muted))
         lay.addWidget(title)
 
-        self.status_label = QLabel("●")
+        self.status_label = QLabel("—")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_label.setFont(QFont("Helvetica Neue", 36, QFont.Weight.Black))
-        self.status_label.setStyleSheet(self._lbl_qss("#fb7185"))
+        self.status_label.setFont(QFont("Helvetica Neue", 16, QFont.Weight.Bold))
+        self.status_label.setStyleSheet(self._lbl_qss(self._pal.text))
         lay.addWidget(self.status_label)
+
+        self.reason_label = QLabel("")
+        self.reason_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.reason_label.setWordWrap(True)
+        self.reason_label.setFont(QFont("Helvetica Neue", 11, QFont.Weight.Medium))
+        self.reason_label.setStyleSheet(self._lbl_qss(self._pal.muted))
+        self.reason_label.setVisible(False)
+        lay.addWidget(self.reason_label)
 
         self.latency_label = QLabel("—")
         self.latency_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.latency_label.setFont(QFont("Helvetica Neue", 22, QFont.Weight.Black))
-        self.latency_label.setStyleSheet(self._lbl_qss(self._muted()))
+        self.latency_label.setFont(QFont("Helvetica Neue", 22, QFont.Weight.Bold))
+        self.latency_label.setStyleSheet(self._lbl_qss(self._pal.text))
         lay.addWidget(self.latency_label)
-
-        self.latency_unit = QLabel("ms")
-        self.latency_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.latency_unit.setFont(QFont("Helvetica Neue", 10, QFont.Weight.Medium))
-        self.latency_unit.setStyleSheet(self._lbl_qss(self._muted()))
-        lay.addWidget(self.latency_unit)
 
         lay.addStretch(1)
 
@@ -80,73 +83,58 @@ class CompactStatusWindow(QFrame):
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
 
-    def _muted(self) -> str:
-        return "#94a3b8" if self._dark else "#78716c"
-
     def _lbl_qss(self, color: str) -> str:
         return f"border: none; outline: none; background: transparent; color: {color};"
 
     def _shell_qss(self) -> str:
-        if self._dark:
-            return """
-                QFrame#CompactStatusWindow {
-                    background: #0f172a;
-                    border: 2px solid #10b981;
-                    border-radius: 16px;
-                }
-            """
-        return """
-            QFrame#CompactStatusWindow {
-                background: #ffffff;
-                border: 2px solid #10b981;
-                border-radius: 16px;
-            }
+        p = self._pal
+        return f"""
+            QFrame#CompactStatusWindow {{
+                background: {p.surface};
+                border: 1px solid {p.border};
+                border-radius: 12px;
+            }}
         """
 
     def _menu_qss(self) -> str:
-        c = "#64748b" if self._dark else "#57534e"
-        h = "#e2e8f0" if self._dark else "#1c1917"
+        p = self._pal
         return f"""
             QPushButton {{
-                border: none;
-                background: transparent;
-                color: {c};
+                border: 1px solid {p.border};
+                background: {p.surface};
+                color: {p.text};
+                border-radius: 8px;
                 padding: 4px 12px;
                 font-weight: 600;
             }}
-            QPushButton:hover {{ color: {h}; }}
-            QPushButton:pressed {{ color: {h}; }}
+            QPushButton:hover {{ border-color: {p.text}; }}
         """
 
     def update_status(self, status) -> None:
-        if status.status == "online":
-            color = "#2dd4bf"
-            border = "#10b981"
-        elif status.status == "unstable":
-            color = "#fbbf24"
-            border = "#f59e0b"
-        else:
-            color = "#fb7185"
-            border = "#ef4444"
-        self.status_label.setText("●")
+        glyphs = {"online": "✓", "unstable": "!", "captive": "!", "offline": "✕"}
+        names = {"online": "Online", "unstable": "Unstable", "captive": "Captive", "offline": "Offline"}
+        glyph = glyphs.get(status.status, "✕")
+        name = names.get(status.status, "Unknown")
+        color = status_color(self._pal, status.status)
+        self.status_label.setText(f"{glyph}  {name}")
+        self.status_label.setAccessibleName(name)
         self.status_label.setStyleSheet(self._lbl_qss(color))
-        bg = "#0f172a" if self._dark else "#ffffff"
-        self.setStyleSheet(
-            f"""
-            QFrame#CompactStatusWindow {{
-                background: {bg};
-                border: 2px solid {border};
-                border-radius: 16px;
-            }}
-            """
-        )
+        reason = getattr(status, "reason", None)
+        if reason and reason != "ok":
+            text = reason_text(reason)
+            self.reason_label.setText(text)
+            self.reason_label.setVisible(True)
+            self.status_label.setAccessibleDescription(text)
+        else:
+            self.reason_label.setText("")
+            self.reason_label.setVisible(False)
+            self.status_label.setAccessibleDescription("")
 
         if getattr(status, "avg_latency_ms", None) is not None:
-            self.latency_label.setText(f"{status.avg_latency_ms:.0f}")
-            self.latency_unit.setVisible(True)
+            self.latency_label.setText(f"{status.avg_latency_ms:.0f} ms")
         else:
             self.latency_label.setText("—")
-            self.latency_unit.setVisible(False)
+        self.adjustSize()
 
     def _show_menu(self) -> None:
         menu = None

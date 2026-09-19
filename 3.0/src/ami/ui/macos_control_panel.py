@@ -116,6 +116,8 @@ class MacOSControlPanel(QDialog):
     def update_status(self, status_key: str, latency_ms: float | None = None) -> None:
         if status_key == "online":
             color, label = "#10b981", "ONLINE"
+        elif status_key == "captive":
+            color, label = "#f97316", "CAPTIVE"
         elif status_key == "unstable":
             color, label = "#f59e0b", "INSTABILE"
         else:

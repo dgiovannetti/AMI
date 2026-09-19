@@ -33,33 +33,35 @@ Feature suggestions are welcome! Please include:
 
 ## 💻 Development Setup
 
+Active development is **AMI 3.x** in `3.0/` (Python 3.10+). The root `src/` tree is the frozen 2.x line; do not add features there.
+
 ```bash
-# Clone your fork
 git clone https://github.com/YOUR_USERNAME/AMI.git
-cd AMI
+cd AMI/3.0
 
-# Install dependencies
 pip install -r requirements.txt
-pip install -r requirements-build.txt
+pip install pytest
 
-# Run in development mode
-python AMI.py
+# Run
+python run.py
+
+# Tests
+PYTHONPATH=src python -m pytest
 ```
 
 ## 🏗️ Project Structure
 
 ```
 AMI/
-├── src/              # Source code
-│   ├── tray_app.py       # Main application
-│   ├── network_monitor.py # Network monitoring
-│   ├── dashboard.py       # Dashboard UI
-│   ├── logger.py          # Event logging
-│   ├── notifier.py        # Notifications
-│   └── api_server.py      # HTTP API
-├── tools/            # Build and utility tools
-├── resources/        # Icons and assets
-└── config.json       # Configuration
+├── 3.0/                      # Current product (v3.x)
+│   ├── src/ami/
+│   │   ├── core/             # config, paths, models
+│   │   ├── services/         # monitor, logger, API, updater
+│   │   └── ui/               # tray, dashboard, settings
+│   ├── tests/
+│   ├── config.json
+│   └── resources/
+└── src/                      # Legacy 2.x (do not extend)
 ```
 
 ## 📝 Coding Standards
@@ -84,12 +86,11 @@ AMI/
 ## 🧪 Testing
 
 Before submitting a PR:
-1. Test the application manually
-2. Verify all menu items work
-3. Check dashboard displays correctly
-4. Test notifications
-5. Verify logs are created correctly
-6. Build the executable and test it
+1. Run `PYTHONPATH=src python -m pytest` from `3.0/`
+2. Test the application manually (`python run.py`)
+3. Verify tray menu, dashboard, and notifications
+4. Verify logs are created correctly
+5. Build the executable and test it if you touched packaging
 
 ## 📋 Code Review Process
 
@@ -101,12 +102,10 @@ Before submitting a PR:
 ## 🎯 Priority Areas
 
 Current areas where contributions are especially welcome:
-- **Settings GUI** - Replace config.json editing with a proper UI
-- **Dark/Light Theme** - Implement automatic theme switching
-- **Network Speed Tests** - Add bandwidth testing
+- **Classifier accuracy** - Captive portal, proxy, and LAN-only cases
+- **Tests** - API, updater, and UI smoke coverage
 - **Localization** - Add support for multiple languages
-- **macOS/Linux Support** - Improve cross-platform compatibility
-- **Unit Tests** - Add comprehensive test coverage
+- **Linux packaging** - CI currently builds Windows and macOS only
 
 ## 📄 License
 

@@ -1,7 +1,9 @@
 """Tests for network status analysis and local network helpers."""
 
+import time
+
 from ami.core.models import PingResult
-from ami.services.network_monitor import NetworkMonitor, parse_ping_latency_ms
+from ami.services.network_monitor import NetworkMonitor, p2p_vpn_adapter, parse_ping_latency_ms
 
 
 def _monitor(**overrides) -> NetworkMonitor:
@@ -172,13 +174,108 @@ def test_enrich_status_fills_isp_without_changing_line_state(monkeypatch):
         local_ok=True,
     )
     monkeypatch.setattr(
-        mon, "_get_public_network_info", lambda: {"ip": "1.2.3.4", "isp": "TestISP"}
+        mon, "_get_public_network_info", lambda force=False: {"ip": "1.2.3.4", "isp": "TestISP"}
     )
     monkeypatch.setattr(mon, "_detect_vpn", lambda isp: (False, ""))
+    mon.lookup_public_network = True
     enriched = mon.enrich_status(status)
     assert enriched.status == "online"
     assert enriched.public_ip == "1.2.3.4"
     assert enriched.isp == "TestISP"
+
+
+def test_enrich_skips_public_lookup_when_disabled(monkeypatch):
+    mon = _monitor()
+    mon.lookup_public_network = False
+    mon.total_checks = 2
+    mon._last_isp_info = {"ip": "9.9.9.9", "isp": "Cached"}
+    status = mon.analyze_connection(
+        [PingResult(host="8.8.8.8", success=True, latency_ms=20)],
+        http_ok=True,
+        local_ok=True,
+    )
+
+    def boom(*_a, **_k):
+        raise AssertionError("public lookup must not run")
+
+    monkeypatch.setattr("ami.services.network_monitor.requests.get", boom)
+    monkeypatch.setattr(mon, "_detect_vpn", lambda isp: (False, ""))
+    enriched = mon.enrich_status(status)
+    assert enriched.isp is None
+    assert enriched.public_ip is None
+    assert mon._last_isp_info is None
+
+
+def _online_status(mon):
+    return mon.analyze_connection(
+        [PingResult(host="8.8.8.8", success=True, latency_ms=20)],
+        http_ok=True,
+        local_ok=True,
+    )
+
+
+def test_path_change_refreshes_isp_cache(monkeypatch):
+    mon = _monitor()
+    mon.total_checks = 2
+    mon.lookup_public_network = True
+    mon._last_isp_info = {"ip": "9.9.9.9", "isp": "Old"}
+    mon._last_isp_check_ts = time.time()
+    mon._last_path_fp = "old-path"
+    seen = {}
+
+    def lookup(force=False):
+        seen["force"] = force
+        seen["cache"] = mon._last_isp_info
+        return {"ip": "1.1.1.1", "isp": "New"}
+
+    monkeypatch.setattr(mon, "_path_fingerprint", lambda: "new-path")
+    monkeypatch.setattr(mon, "_get_public_network_info", lookup)
+    monkeypatch.setattr(mon, "_detect_vpn", lambda *_a, **_k: (False, ""))
+    enriched = mon.enrich_status(_online_status(mon))
+    assert seen["force"] is True
+    assert seen["cache"] is None
+    assert enriched.public_ip == "1.1.1.1"
+    assert enriched.isp == "New"
+
+
+def test_isp_cache_held_when_path_unchanged(monkeypatch):
+    mon = _monitor()
+    mon.total_checks = 2
+    mon.lookup_public_network = True
+    mon._last_isp_info = {"ip": "9.9.9.9", "isp": "Cached"}
+    mon._last_isp_check_ts = time.time()
+    mon._last_path_fp = "same"
+
+    def boom(*_a, **_k):
+        raise AssertionError("lookup must use cache")
+
+    monkeypatch.setattr("ami.services.network_monitor.requests.get", boom)
+    monkeypatch.setattr(mon, "_path_fingerprint", lambda: "same")
+    monkeypatch.setattr(mon, "_detect_vpn", lambda *_a, **_k: (False, ""))
+    enriched = mon.enrich_status(_online_status(mon))
+    assert enriched.public_ip == "9.9.9.9"
+    assert enriched.isp == "Cached"
+
+
+def test_detect_vpn_ignores_isp_org_without_adapter(monkeypatch):
+    mon = _monitor()
+    monkeypatch.setattr(mon, "_scutil_connected", lambda: False)
+    monkeypatch.setattr(mon, "_local_vpn_adapter", lambda: "")
+    monkeypatch.setattr(mon, "_vpn_process_hint", lambda: "proc:protonvpn")
+    assert mon._detect_vpn("ProtonVPN") == (False, "")
+
+
+def test_plain_utun_inet_is_not_a_vpn_adapter():
+    system = (
+        "utun3: flags=8051<UP,RUNNING,MULTICAST> mtu 1500\n"
+        "\tinet 10.0.0.2 netmask 0xffffff00\n"
+    )
+    tunnel = (
+        "utun4: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1420\n"
+        "\tinet 10.8.0.2 --> 10.8.0.1 netmask 0xffffffff\n"
+    )
+    assert p2p_vpn_adapter(system) == ""
+    assert p2p_vpn_adapter(tunnel) == "utun4"
 
 
 def test_seed_history_from_logs_keeps_offline_and_unstable():
@@ -326,3 +423,128 @@ def test_windows_ping_failure_skips_cascade(monkeypatch):
     result = mon.ping_host("8.8.8.8", timeout=2, quick=True)
     assert result.success is False
     assert result.error == "ping failed"
+
+
+def test_analyze_connection_captive_when_ping_ok_and_http_fails():
+    mon = _monitor()
+    pings = [PingResult(host="8.8.8.8", success=True, latency_ms=20)]
+    status = mon.analyze_connection(pings, http_ok=False, local_ok=True)
+    assert status.status == "captive"
+    assert status.reason == "captive"
+    assert status.internet_ok is False
+    assert status.http_test_ok is False
+
+
+def test_analyze_connection_lan_only_when_pings_fail():
+    mon = _monitor()
+    pings = [PingResult(host="8.8.8.8", success=False)]
+    status = mon.analyze_connection(pings, http_ok=False, local_ok=True)
+    assert status.status == "offline"
+    assert status.reason == "lan_only"
+
+
+def test_analyze_connection_http_failed_without_lan():
+    mon = _monitor()
+    pings = [PingResult(host="8.8.8.8", success=True, latency_ms=30)]
+    status = mon.analyze_connection(pings, http_ok=False, local_ok=False)
+    assert status.status == "offline"
+    assert status.reason == "http_failed"
+
+
+def test_analyze_connection_packet_loss_reason():
+    mon = _monitor()
+    pings = [
+        PingResult(host="8.8.8.8", success=True, latency_ms=20),
+        PingResult(host="1.1.1.1", success=False),
+        PingResult(host="9.9.9.9", success=False),
+    ]
+    status = mon.analyze_connection(pings, http_ok=True, local_ok=True)
+    assert status.status == "unstable"
+    assert status.reason == "packet_loss"
+
+
+def test_http_204_is_online_and_302_is_not(monkeypatch):
+    mon = _monitor()
+    mon.retry_count = 0
+
+    class Resp:
+        def __init__(self, code):
+            self.status_code = code
+
+    def fake_get(url, timeout=None, allow_redirects=None):
+        assert allow_redirects is False
+        if url.endswith("/generate_204"):
+            return Resp(204)
+        return Resp(302)
+
+    monkeypatch.setattr("ami.services.network_monitor.requests.get", fake_get)
+    mon.http_test_url = "https://example.com/generate_204"
+    assert mon.test_http_connectivity() is True
+    mon.http_test_url = "https://wifi.example/portal"
+    assert mon.test_http_connectivity() is False
+
+
+def test_retry_count_repeats_failed_http(monkeypatch):
+    mon = _monitor()
+    mon.retry_count = 2
+    calls = {"n": 0}
+
+    class Resp:
+        status_code = 302
+
+    def fake_get(*_a, **_k):
+        calls["n"] += 1
+        return Resp()
+
+    monkeypatch.setattr("ami.services.network_monitor.requests.get", fake_get)
+    assert mon.test_http_connectivity() is False
+    assert calls["n"] == 3
+
+
+def test_retry_count_zero_is_single_http_attempt(monkeypatch):
+    mon = _monitor()
+    mon.retry_count = 0
+    calls = {"n": 0}
+
+    class Resp:
+        status_code = 500
+
+    def fake_get(*_a, **_k):
+        calls["n"] += 1
+        return Resp()
+
+    monkeypatch.setattr("ami.services.network_monitor.requests.get", fake_get)
+    assert mon.test_http_connectivity() is False
+    assert calls["n"] == 1
+
+
+def test_uptime_counts_only_online(monkeypatch):
+    mon = _monitor()
+    script = [
+        ([PingResult(host="8.8.8.8", success=True, latency_ms=20)], True),
+        ([PingResult(host="8.8.8.8", success=True, latency_ms=900)], True),
+        ([PingResult(host="8.8.8.8", success=True, latency_ms=20)], False),
+        ([PingResult(host="8.8.8.8", success=False)], False),
+    ]
+    idx = {"i": 0}
+
+    def fake_ping_all():
+        return script[idx["i"]][0]
+
+    def fake_http(**_kw):
+        return script[idx["i"]][1]
+
+    monkeypatch.setattr(mon, "ping_all_hosts", fake_ping_all)
+    monkeypatch.setattr(mon, "test_http_connectivity", fake_http)
+    monkeypatch.setattr(mon, "check_local_network", lambda **_kw: True)
+
+    seen = []
+    for _ in script:
+        seen.append(mon.check_connection().status)
+        idx["i"] += 1
+
+    assert seen == ["online", "unstable", "captive", "offline"]
+    assert mon.successful_checks == 1
+    assert mon.total_checks == 4
+    assert mon.get_uptime_percentage() == 25.0
+

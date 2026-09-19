@@ -8,7 +8,7 @@ Se apri **Mostra contenuto pacchetto** → `Contents` → `MacOS` → file **`AM
 
 ### Build attuale
 
-**AMI 3.1.4** si scarica come ZIP il cui nome contiene **`macos`** (es. `AMI-v3.1.4-macos.zip`). Dopo **Estrai**, **`AMI.app`** è **nella cartella che si crea**, in **primo piano** (insieme a `LEGGIMI_macOS.txt`, `config.json`, `resources/`). Non serve cercare una sottocartella `AMI-Package`. L’app ha bundle id `tech.ciaoim.ami` e nome **AMI** in Finder.
+**AMI 3.3.0** si scarica come ZIP il cui nome contiene **`macos`** (es. `AMI-v3.3.0-macos.zip`). Dopo **Estrai**, **`AMI.app`** è **nella cartella che si crea**, in **primo piano** (insieme a `LEGGIMI_macOS.txt`, `config.json`, `resources/`). Non serve cercare una sottocartella `AMI-Package`. L’app ha bundle id `tech.ciaoim.ami` e nome **AMI** in Finder.
 
 **Evita** vecchi file tipo **`AMI-macOS.zip`** sulla stessa pagina Release (nomi senza versione): possono essere pacchetti diversi o obsoleti.
 
@@ -168,7 +168,7 @@ Modifica `.github/workflows/build.yml`:
 
 ### L’app si chiude subito (crash report: `CFBundleCopyBundleURL` / `QtCore` / `EXC_BAD_ACCESS`)
 
-Qt 6 nel bundle PyInstaller su macOS molto recenti poteva crashare nell’init statico di `QtCore.abi3.so`. Le build aggiornate includono **`Contents/Resources/qt.conf`**, variabili **`QT_CONF` / `QT_PLUGIN_PATH`** (path assoluti) prima di PyQt6 e **PyQt6 ≥ 6.8**. Se vedi ancora il crash, **scarica di nuovo** `AMI-v3.1.4-macos.zip` dopo l’ultimo workflow Release.
+Qt 6 nel bundle PyInstaller su macOS molto recenti poteva crashare nell’init statico di `QtCore.abi3.so`. Le build aggiornate includono **`Contents/Resources/qt.conf`**, variabili **`QT_CONF` / `QT_PLUGIN_PATH`** (path assoluti) prima di PyQt6 e **PyQt6 ≥ 6.8**. Se vedi ancora il crash, **scarica di nuovo** `AMI-v3.3.0-macos.zip` dopo l’ultimo workflow Release.
 
 ### "L'app è danneggiata e non può essere aperta"
 

@@ -3,10 +3,14 @@ AMI 3.0 - Optional local HTTP API for status/stats.
 Supports optional auth_token in config.
 """
 
+import hmac
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Optional
+from urllib.parse import urlsplit
+
+from ami import __version__
 
 
 class APIHandler(BaseHTTPRequestHandler):
@@ -24,7 +28,12 @@ class APIHandler(BaseHTTPRequestHandler):
         if not auth:
             return False
         parts = auth.split()
-        return len(parts) == 2 and parts[0].lower() == "bearer" and parts[1] == token
+        if len(parts) != 2 or parts[0].lower() != "bearer":
+            return False
+        try:
+            return hmac.compare_digest(parts[1], token)
+        except (TypeError, ValueError):
+            return False
 
     def do_GET(self):
         if not self._check_auth():
@@ -33,11 +42,12 @@ class APIHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b'{"error":"Unauthorized"}')
             return
-        if self.path == "/status":
+        path = urlsplit(self.path).path
+        if path == "/status":
             self.send_status()
-        elif self.path == "/health":
+        elif path == "/health":
             self.send_health()
-        elif self.path == "/stats":
+        elif path == "/stats":
             self.send_statistics()
         else:
             self.send_error(404, "Endpoint not found")
@@ -57,6 +67,7 @@ class APIHandler(BaseHTTPRequestHandler):
             "local_network_ok": status.local_network_ok,
             "internet_ok": status.internet_ok,
             "http_test_ok": status.http_test_ok,
+            "reason": getattr(status, "reason", None) or "ok",
         }
         if getattr(status, "speed_mbps", None) is not None:
             payload["speed_mbps"] = status.speed_mbps
@@ -65,14 +76,10 @@ class APIHandler(BaseHTTPRequestHandler):
         self.send_json_response(payload)
 
     def send_health(self):
-        _, config, _ = self._get_server_attrs()
-        version = "3.2.2"
-        if config:
-            version = config.get("app", {}).get("version", version)
         self.send_json_response({
             "service": "AMI",
             "status": "running",
-            "version": version,
+            "version": __version__,
         })
 
     def send_statistics(self):

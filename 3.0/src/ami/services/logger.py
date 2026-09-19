@@ -23,8 +23,11 @@ class EventLogger:
         self.max_size_bytes = int(self.max_size_mb * 1024 * 1024)
         if self.enabled:
             Path(self.log_file).parent.mkdir(parents=True, exist_ok=True)
+        self._write_reason = False
         if self.enabled and not os.path.exists(self.log_file):
             self._create_log_file()
+        elif self.enabled:
+            self._write_reason = self._header_has_reason()
 
     def _create_log_file(self) -> None:
         with open(self.log_file, "w", newline="", encoding="utf-8") as f:
@@ -39,8 +42,18 @@ class EventLogger:
                     "Local Network",
                     "Internet OK",
                     "HTTP Test OK",
+                    "Reason",
                 ]
             )
+        self._write_reason = True
+
+    def _header_has_reason(self) -> bool:
+        try:
+            with open(self.log_file, "r", encoding="utf-8") as f:
+                header = f.readline()
+            return "Reason" in header
+        except OSError:
+            return False
 
     def _check_log_size(self, next_bytes: int = 0) -> None:
         if not os.path.exists(self.log_file):
@@ -74,6 +87,8 @@ class EventLogger:
                 "Yes" if status.internet_ok else "No",
                 "Yes" if status.http_test_ok else "No",
             ]
+            if self._write_reason:
+                row.append(getattr(status, "reason", "") or "")
             self._check_log_size(self._estimate_row_bytes(row))
             with open(self.log_file, "a", newline="", encoding="utf-8") as f:
                 csv.writer(f).writerow(row)

@@ -70,6 +70,11 @@ def _log_exception(context: str, exc: BaseException | None = None) -> None:
     _append_log(crash_log_path(), line)
 
 
+def log_diagnostic(context: str, exc: BaseException | None = None) -> None:
+    """Append a diagnostic line to ami-crash.log (monitor failures, not only crashes)."""
+    _log_exception(context, exc)
+
+
 def announce_crash_log_path() -> None:
     """Print crash log location once (so Windows testers know where to look)."""
     global _announced

@@ -1,10 +1,62 @@
 """
-AMI 3.0 - Theme support: light, dark, auto (system).
+AMI 3.0 - Theme support: light (default look), dark, auto (system).
+Light-first: paper canvas, one accent, 1px borders. No gradients.
 """
 
+from dataclasses import dataclass
 from typing import Literal
 
 ThemeName = Literal["auto", "light", "dark"]
+
+
+@dataclass(frozen=True)
+class Palette:
+    page: str
+    surface: str
+    text: str
+    muted: str
+    border: str
+    accent: str
+    accent_hover: str
+    on_accent: str
+    online: str
+    unstable: str
+    captive: str
+    offline: str
+    grid: str
+
+
+LIGHT = Palette(
+    page="#f7f7f5",
+    surface="#ffffff",
+    text="#141414",
+    muted="#5c5c5c",
+    border="#e6e6e3",
+    accent="#ff6d5a",
+    accent_hover="#e85a48",
+    on_accent="#ffffff",
+    online="#1a7f4b",
+    unstable="#d97706",
+    captive="#6d28d9",
+    offline="#b91c1c",
+    grid="#eceae6",
+)
+
+DARK = Palette(
+    page="#161616",
+    surface="#1e1e1e",
+    text="#f2f0ea",
+    muted="#9a9790",
+    border="#2e2e2e",
+    accent="#ff6d5a",
+    accent_hover="#ff8574",
+    on_accent="#141414",
+    online="#3ecf8e",
+    unstable="#f5a524",
+    captive="#c4b5fd",
+    offline="#f07167",
+    grid="#2a2a2a",
+)
 
 
 def _is_dark_system() -> bool:
@@ -30,52 +82,76 @@ def resolve_theme(theme: ThemeName) -> Literal["light", "dark"]:
     return "dark" if _is_dark_system() else "light"
 
 
+def palette(theme: ThemeName) -> Palette:
+    return DARK if resolve_theme(theme) == "dark" else LIGHT
+
+
+def status_color(pal: Palette, status: str) -> str:
+    if status == "online":
+        return pal.online
+    if status == "unstable":
+        return pal.unstable
+    if status == "captive":
+        return pal.captive
+    return pal.offline
+
+
 def get_stylesheet(theme: ThemeName) -> str:
     """Return main window/dialog stylesheet for the given theme."""
-    effective = resolve_theme(theme)
-    if effective == "dark":
-        return """
-            QMainWindow, QDialog, QWidget { background-color: #0f172a; }
-            QLabel { color: #e2e8f0; }
-            QFrame { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; }
-            QPushButton {
-                background-color: #3b82f6; color: #ffffff; border: none; border-radius: 8px;
-                padding: 10px 20px; font-size: 13px; font-weight: 600;
-            }
-            QPushButton:hover { background-color: #2563eb; }
-            QPushButton:pressed { background-color: #1d4ed8; }
-            QPushButton:disabled { background-color: #475569; color: #94a3b8; }
-            QLineEdit, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QComboBox, QTextEdit {
-                background-color: #1e293b; border: 1px solid #475569; border-radius: 6px;
-                color: #e2e8f0; padding: 8px 12px;
-            }
-            QTabWidget::pane { background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; }
-            QTabBar::tab { background: transparent; color: #94a3b8; padding: 10px 20px; }
-            QTabBar::tab:selected { color: #f8fafc; border-bottom: 2px solid #3b82f6; }
-            QCheckBox { color: #cbd5e1; spacing: 8px; }
-            QProgressBar { background-color: #334155; border-radius: 6px; }
-            QProgressBar::chunk { background-color: #3b82f6; border-radius: 6px; }
-        """
-    # light
-    return """
-        QMainWindow, QDialog, QWidget { background-color: #f9fafb; }
-        QLabel { color: #111827; }
-        QFrame { background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; }
-        QPushButton {
-            background-color: #3b82f6; color: #ffffff; border: none; border-radius: 8px;
-            padding: 10px 20px; font-size: 13px; font-weight: 600;
-        }
-        QPushButton:hover { background-color: #2563eb; }
-        QPushButton:pressed { background-color: #1d4ed8; }
-        QPushButton:disabled { background-color: #9ca3af; color: #f3f4f6; }
-        QLineEdit, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QComboBox, QTextEdit {
-            background-color: #ffffff; border: 1px solid #d1d5db; border-radius: 6px;
-            color: #111827; padding: 8px 12px;
-        }
-        QTabWidget::pane { background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; }
-        QTabBar::tab { background: transparent; color: #6b7280; padding: 10px 20px; }
-        QTabBar::tab:selected { color: #111827; border-bottom: 2px solid #3b82f6; }
-        QCheckBox { color: #374151; spacing: 8px; }
-        QProgressBar { background-color: #e5e7eb; border-radius: 6px; }
-        QProgressBar::chunk { background-color: #3b82f6; border-radius: 6px; }
+    p = palette(theme)
+    return f"""
+        QMainWindow, QDialog, QWidget {{ background-color: {p.page}; color: {p.text}; }}
+        QLabel {{ color: {p.text}; background: transparent; border: none; }}
+        QFrame {{
+            background-color: {p.surface};
+            border: 1px solid {p.border};
+            border-radius: 12px;
+            color: {p.text};
+        }}
+        QPushButton {{
+            background-color: {p.surface};
+            color: {p.text};
+            border: 1px solid {p.border};
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+        }}
+        QPushButton:hover {{ border-color: {p.text}; }}
+        QPushButton:pressed {{ background-color: {p.page}; }}
+        QPushButton:disabled {{ color: {p.muted}; border-color: {p.border}; }}
+        QPushButton#PrimaryButton {{
+            background-color: {p.accent};
+            color: {p.on_accent};
+            border: 1px solid {p.accent};
+        }}
+        QPushButton#PrimaryButton:hover {{ background-color: {p.accent_hover}; border-color: {p.accent_hover}; }}
+        QLineEdit, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QComboBox, QTextEdit {{
+            background-color: {p.surface};
+            border: 1px solid {p.border};
+            border-radius: 6px;
+            color: {p.text};
+            padding: 8px 12px;
+        }}
+        QTabWidget::pane {{
+            background-color: {p.surface};
+            border: 1px solid {p.border};
+            border-radius: 8px;
+            top: -1px;
+            padding: 8px;
+        }}
+        QTabBar::tab {{ background: transparent; color: {p.muted}; padding: 10px 18px; border: none; }}
+        QTabBar::tab:selected {{ color: {p.text}; border-bottom: 2px solid {p.accent}; }}
+        QCheckBox {{ color: {p.text}; spacing: 8px; }}
+        QMenu {{
+            background-color: {p.surface};
+            color: {p.text};
+            border: 1px solid {p.border};
+            padding: 4px;
+        }}
+        QMenu::item {{ padding: 6px 18px; background: transparent; }}
+        QMenu::item:disabled {{ color: {p.muted}; }}
+        QMenu::separator {{ height: 1px; background: {p.border}; margin: 4px 8px; }}
+        QProgressBar {{ background-color: {p.page}; border: 1px solid {p.border}; border-radius: 6px; }}
+        QProgressBar::chunk {{ background-color: {p.accent}; border-radius: 5px; }}
     """

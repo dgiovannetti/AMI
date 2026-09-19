@@ -25,6 +25,50 @@ _PING_LATENCY_RE = re.compile(
 )
 
 
+_VPN_IFACE_RE = re.compile(r"^(?:utun|tun|ppp|ipsec|wg)\d*$", re.IGNORECASE)
+_INET_RE = re.compile(r"\binet\s+(\d+\.\d+\.\d+\.\d+)")
+_VPN_PROC_KEYWORDS = (
+    "openvpn",
+    "wireguard",
+    "nordvpn",
+    "tailscale",
+    "mullvad",
+    "expressvpn",
+    "protonvpn",
+)
+
+
+def _ifconfig_blocks(text: str) -> List[str]:
+    return [block for block in re.split(r"\n(?=\S)", text or "") if block.strip()]
+
+
+def vpn_ifaces_with_ipv4(text: str) -> str:
+    """tun/utun/ppp/ipsec/wg interfaces that currently have an IPv4 address."""
+    found = []
+    for block in _ifconfig_blocks(text):
+        name = block.split(":", 1)[0].strip()
+        if not _VPN_IFACE_RE.match(name):
+            continue
+        match = _INET_RE.search(block)
+        if match:
+            found.append(f"{name}={match.group(1)}")
+    return ",".join(found)
+
+
+def p2p_vpn_adapter(text: str) -> str:
+    """First VPN-like interface with IPv4 and a point-to-point flag. Plain utun inet is not enough."""
+    for block in _ifconfig_blocks(text):
+        name = block.split(":", 1)[0].strip()
+        if not _VPN_IFACE_RE.match(name):
+            continue
+        header = block.splitlines()[0].lower()
+        if "pointopoint" not in header and "-->" not in block:
+            continue
+        if _INET_RE.search(block):
+            return name
+    return ""
+
+
 def parse_ping_latency_ms(stdout: str) -> Optional[float]:
     """Extract RTT ms from OS ping stdout (EN/IT/DE/FR/ES)."""
     if not stdout:
@@ -71,8 +115,20 @@ class NetworkMonitor:
         self._last_isp_check_ts: float = 0.0
         self._last_vpn_status: Optional[Tuple[bool, str]] = None
         self._last_vpn_check_ts: float = 0.0
+        self._last_path_fp: Optional[str] = None
         self._last_speed_mbps: Optional[float] = None
         self._last_speed_tier: Optional[str] = None
+        self.lookup_public_network = bool(
+            (config.get("privacy") or {}).get("lookup_public_network", True)
+        )
+
+    def _probe_attempts(self) -> int:
+        """1 + retry_count. Zero retries keeps the fail-fast single probe."""
+        try:
+            extra = int(self.retry_count)
+        except (TypeError, ValueError):
+            extra = 0
+        return 1 + max(0, extra)
 
     def _detect_timeout(self) -> int:
         """Short timeout for online/offline detection (fail-fast)."""
@@ -84,7 +140,17 @@ class NetworkMonitor:
         self._last_speed_tier = tier
 
     def ping_host(self, host: str, timeout: int = 5, *, quick: bool = False) -> PingResult:
-        """Ping a single host (ICMP or TCP fallback). quick=True uses short detect timeouts."""
+        """Ping a single host. Failed probes are retried monitoring.retry_count times."""
+        last: Optional[PingResult] = None
+        for _ in range(self._probe_attempts()):
+            last = self._ping_host_once(host, timeout, quick=quick)
+            if last.success:
+                return last
+        assert last is not None
+        return last
+
+    def _ping_host_once(self, host: str, timeout: int = 5, *, quick: bool = False) -> PingResult:
+        """One ICMP or TCP attempt. quick=True uses short detect timeouts."""
         try:
             # Windows: trust ping.exe outcome; do not cascade into ping3/DNS if it ran.
             if sys.platform == "win32":
@@ -173,15 +239,17 @@ class NetworkMonitor:
         else:
             req_timeout = float(self.timeout)
         urls = [self.http_test_url] + list(self.http_test_urls)[:5]
-        for url in urls:
-            if not url or not url.strip():
-                continue
-            try:
-                r = requests.get(url.strip(), timeout=req_timeout, allow_redirects=False)
-                if r.status_code in (200, 204):
-                    return True
-            except Exception:
-                continue
+        for _attempt in range(self._probe_attempts()):
+            for url in urls:
+                if not url or not url.strip():
+                    continue
+                try:
+                    r = requests.get(url.strip(), timeout=req_timeout, allow_redirects=False)
+                    # 200/204 only. A 302 with redirects disabled is a captive portal.
+                    if r.status_code in (200, 204):
+                        return True
+                except Exception:
+                    continue
         return False
 
     def _default_gateway(self) -> Optional[str]:
@@ -310,17 +378,26 @@ class NetworkMonitor:
         )
         success_rate = (success_count / total * 100) if total > 0 else 0
         internet_ok = success_count > 0 and http_ok
+        loss_bad = total > 0 and success_rate < (100 - self.unstable_loss)
+        latency_bad = bool(avg_latency and avg_latency > self.unstable_latency)
 
         if success_count == 0:
             status = "offline"
-        elif not local_ok and not http_ok:
-            status = "offline"
-        elif success_rate < (100 - self.unstable_loss) or (
-            avg_latency and avg_latency > self.unstable_latency
-        ):
+            reason = "lan_only" if local_ok else "offline"
+        elif not http_ok:
+            # ICMP often passes on a captive portal. HTTP is "really online".
+            if local_ok:
+                status = "captive"
+                reason = "captive"
+            else:
+                status = "offline"
+                reason = "http_failed"
+        elif loss_bad or latency_bad:
             status = "unstable"
+            reason = "packet_loss" if loss_bad else "high_latency"
         else:
             status = "online"
+            reason = "ok"
 
         return ConnectionStatus(
             status=status,
@@ -330,6 +407,7 @@ class NetworkMonitor:
             local_network_ok=local_ok,
             internet_ok=internet_ok,
             http_test_ok=http_ok,
+            reason=reason,
         )
 
     def check_connection(self) -> ConnectionStatus:
@@ -355,7 +433,8 @@ class NetworkMonitor:
         status.speed_mbps = self._last_speed_mbps
         status.speed_tier = self._last_speed_tier
 
-        if status.status in ("online", "unstable"):
+        # Uptime is time really online, not "a packet got through".
+        if status.status == "online":
             self.successful_checks += 1
         self.status_history.append(status)
         if len(self.status_history) > self.max_history:
@@ -370,7 +449,7 @@ class NetworkMonitor:
         seeded: List[ConnectionStatus] = []
         for row in rows:
             raw = (row.get("Status") or row.get("status") or "").strip().lower()
-            if raw not in ("online", "unstable", "offline"):
+            if raw not in ("online", "unstable", "captive", "offline"):
                 continue
             lat_raw = row.get("Avg Latency (ms)") or row.get("avg_latency_ms") or "N/A"
             avg: Optional[float] = None
@@ -397,6 +476,14 @@ class NetworkMonitor:
             local_ok = str(row.get("Local Network") or "").strip().lower() in ("yes", "true", "1")
             internet_ok = str(row.get("Internet OK") or "").strip().lower() in ("yes", "true", "1")
             http_ok = str(row.get("HTTP Test OK") or "").strip().lower() in ("yes", "true", "1")
+            reason = (row.get("Reason") or row.get("reason") or "").strip()
+            if not reason:
+                reason = {
+                    "online": "ok",
+                    "unstable": "high_latency",
+                    "captive": "captive",
+                    "offline": "offline",
+                }.get(raw, "offline")
             seeded.append(
                 ConnectionStatus(
                     status=raw,
@@ -407,6 +494,7 @@ class NetworkMonitor:
                     internet_ok=internet_ok,
                     http_test_ok=http_ok,
                     timestamp=ts,
+                    reason=reason,
                 )
             )
         if not seeded:
@@ -414,9 +502,12 @@ class NetworkMonitor:
         self.status_history = seeded[-self.max_history :]
 
     def _apply_cached_enrichment(self, status: ConnectionStatus) -> None:
-        if self._last_isp_info:
+        if self.lookup_public_network and self._last_isp_info:
             status.public_ip = self._last_isp_info.get("ip")
             status.isp = self._last_isp_info.get("isp")
+        elif not self.lookup_public_network:
+            status.public_ip = None
+            status.isp = None
         if self._last_vpn_status is not None:
             status.vpn_connected = self._last_vpn_status[0]
             status.vpn_provider = self._last_vpn_status[1] or None
@@ -425,16 +516,24 @@ class NetworkMonitor:
         """
         ISP/VPN enrichment for tooltip/menu — call after tray icon update.
         Does not change online/offline/unstable.
+        A local path change drops the ISP and VPN caches so the next lookup is fresh.
         """
         if self.total_checks <= 1:
             return status
-        try:
-            isp_info = self._get_public_network_info()
-            if isp_info:
-                status.public_ip = isp_info.get("ip")
-                status.isp = isp_info.get("isp")
-        except Exception:
-            pass
+        path_changed = self._note_path_change()
+        if self.lookup_public_network:
+            try:
+                isp_info = self._get_public_network_info(force=path_changed)
+                if isp_info:
+                    status.public_ip = isp_info.get("ip")
+                    status.isp = isp_info.get("isp")
+            except Exception:
+                pass
+        else:
+            status.public_ip = None
+            status.isp = None
+            self._last_isp_info = None
+            self._last_public_ip = None
         try:
             vpn_connected, vpn_hint = self._detect_vpn(status.isp)
             status.vpn_connected = vpn_connected
@@ -446,6 +545,69 @@ class NetworkMonitor:
         ):
             self.last_status = status
         return status
+
+    def _note_path_change(self) -> bool:
+        fp = self._path_fingerprint()
+        prev = self._last_path_fp
+        self._last_path_fp = fp
+        if prev is None or fp == prev:
+            return False
+        self._last_isp_info = None
+        self._last_public_ip = None
+        self._last_isp_check_ts = 0.0
+        self._last_vpn_status = None
+        self._last_vpn_check_ts = 0.0
+        return True
+
+    def _path_fingerprint(self) -> str:
+        """Cheap local route/interface signature. No public HTTP."""
+        try:
+            if sys.platform == "darwin":
+                return self._darwin_path_fingerprint()
+            if sys.platform == "win32":
+                return self._windows_path_fingerprint()
+        except Exception:
+            pass
+        return self._last_path_fp or ""
+
+    def _cmd(self, args: List[str], timeout: int = 2) -> str:
+        kwargs = {"text": True, "timeout": timeout}
+        if sys.platform == "win32":
+            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        return subprocess.check_output(args, **kwargs)
+
+    def _darwin_path_fingerprint(self) -> str:
+        route = ""
+        try:
+            out = self._cmd(["route", "-n", "get", "default"])
+            iface = gateway = ""
+            for line in out.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("interface:"):
+                    iface = stripped.split(":", 1)[1].strip()
+                elif stripped.startswith("gateway:"):
+                    gateway = stripped.split(":", 1)[1].strip()
+            route = f"{iface}:{gateway}"
+        except Exception:
+            route = ""
+        scutil = "0"
+        try:
+            out = self._cmd(["scutil", "--nc", "list"])
+            scutil = "1" if re.search(r"\bConnected\b", out) else "0"
+        except Exception:
+            scutil = ""
+        ifaces = ""
+        try:
+            ifaces = vpn_ifaces_with_ipv4(self._cmd(["ifconfig"]))
+        except Exception:
+            ifaces = ""
+        return f"darwin|{route}|{scutil}|{ifaces}"
+
+    def _windows_path_fingerprint(self) -> str:
+        out = self._cmd(["ipconfig", "/all"], timeout=3).lower()
+        flags = [name for name in ("tap", "tun", "wireguard", "nordlynx") if name in out]
+        gateways = re.findall(r"default gateway[^\n:]*:\s*(\d+\.\d+\.\d+\.\d+)", out)
+        return "win|" + ",".join(flags) + "|" + ",".join(gateways)
 
     def _simulate_connection(self) -> ConnectionStatus:
         """Simulate status for internal testing."""
@@ -460,6 +622,7 @@ class NetworkMonitor:
                 local_network_ok=True,
                 internet_ok=True,
                 http_test_ok=True,
+                reason="ok",
             )
         if phase <= 8:
             return ConnectionStatus(
@@ -470,6 +633,7 @@ class NetworkMonitor:
                 local_network_ok=True,
                 internet_ok=True,
                 http_test_ok=True,
+                reason="high_latency",
             )
         return ConnectionStatus(
             status="offline",
@@ -479,11 +643,16 @@ class NetworkMonitor:
             local_network_ok=True,
             internet_ok=False,
             http_test_ok=False,
+            reason="lan_only",
         )
 
-    def _get_public_network_info(self) -> Optional[Dict]:
+    def _get_public_network_info(self, force: bool = False) -> Optional[Dict]:
         now = time.time()
-        if self._last_isp_info and (now - self._last_isp_check_ts) < 1800:
+        if (
+            not force
+            and self._last_isp_info
+            and (now - self._last_isp_check_ts) < 1800
+        ):
             return self._last_isp_info
         endpoints = [
             (
@@ -512,88 +681,54 @@ class NetworkMonitor:
                 continue
         return self._last_isp_info
 
-    def _detect_vpn(self, isp_text: Optional[str]) -> Tuple[bool, str]:
-        now = time.time()
-        if self._last_vpn_status and (now - self._last_vpn_check_ts) < 10:
-            return self._last_vpn_status
+    def _scutil_connected(self) -> bool:
+        if sys.platform != "darwin":
+            return False
         try:
-            org = (isp_text or "").lower()
-            for kw in [
-                "vpn",
-                "nord",
-                "mullvad",
-                "express",
-                "surfshark",
-                "proton",
-                "wireguard",
-                "tailscale",
-            ]:
-                if kw in org:
-                    self._last_vpn_status = (True, f"org:{kw}")
-                    self._last_vpn_check_ts = now
-                    return self._last_vpn_status
+            out = self._cmd(["scutil", "--nc", "list"])
         except Exception:
-            pass
+            return False
+        return re.search(r"\bConnected\b", out) is not None
+
+    def _local_vpn_adapter(self) -> str:
+        """Point-to-point tunnel name, or Windows TAP/TUN marker. Empty if none."""
         try:
             if sys.platform == "darwin":
-                try:
-                    out = subprocess.check_output(
-                        ["scutil", "--nc", "list"], text=True, timeout=2
-                    )
-                    if "Connected" in out:
-                        self._last_vpn_status = (True, "scutil")
-                        self._last_vpn_check_ts = now
-                        return self._last_vpn_status
-                except Exception:
-                    pass
-                try:
-                    out = subprocess.check_output(["ifconfig"], text=True, timeout=2)
-                    # utun0–2 are often system/iCloud; VPN adapters usually have inet + higher index.
-                    if re.search(
-                        r"^utun([3-9]|\d{2,}):[^\n]*\n(?:[^\n]*\n)*?\s+inet ",
-                        out,
-                        re.MULTILINE,
-                    ):
-                        self._last_vpn_status = (True, "utun")
-                        self._last_vpn_check_ts = now
-                        return self._last_vpn_status
-                except Exception:
-                    pass
-            elif sys.platform == "win32":
-                try:
-                    out = subprocess.check_output(
-                        ["ipconfig", "/all"],
-                        text=True,
-                        timeout=3,
-                        creationflags=subprocess.CREATE_NO_WINDOW,
-                    )
-                    if any(
-                        p in out.lower()
-                        for p in ["tap", "tun", "wireguard", "nordlynx"]
-                    ):
-                        self._last_vpn_status = (True, "adapter")
-                        self._last_vpn_check_ts = now
-                        return self._last_vpn_status
-                except Exception:
-                    pass
-            procs = [p.name().lower() for p in psutil.process_iter(attrs=["name"])]
-            for kw in [
-                "openvpn",
-                "wireguard",
-                "nordvpn",
-                "tailscale",
-                "mullvad",
-                "expressvpn",
-                "protonvpn",
-            ]:
-                if any(kw in pn for pn in procs):
-                    self._last_vpn_status = (True, f"proc:{kw}")
-                    self._last_vpn_check_ts = now
-                    return self._last_vpn_status
+                return p2p_vpn_adapter(self._cmd(["ifconfig"]))
+            if sys.platform == "win32":
+                out = self._cmd(["ipconfig", "/all"], timeout=3).lower()
+                if any(name in out for name in ("tap", "tun", "wireguard", "nordlynx")):
+                    return "adapter"
+        except Exception:
+            return ""
+        return ""
+
+    def _vpn_process_hint(self) -> str:
+        try:
+            names = [proc.name().lower() for proc in psutil.process_iter(attrs=["name"])]
+        except Exception:
+            return ""
+        for keyword in _VPN_PROC_KEYWORDS:
+            if any(keyword in name for name in names):
+                return f"proc:{keyword}"
+        return ""
+
+    def _detect_vpn(self, isp_text: Optional[str] = None) -> Tuple[bool, str]:
+        """Local tunnel only. An ISP name like ProtonVPN is not a live tunnel."""
+        del isp_text
+        try:
+            if self._scutil_connected():
+                self._last_vpn_status = (True, "scutil")
+                return self._last_vpn_status
+            adapter = self._local_vpn_adapter()
+            if adapter:
+                proc = self._vpn_process_hint()
+                # A running app without a tunnel is not connected. Adapter alone is.
+                self._last_vpn_status = (True, proc or adapter)
+                return self._last_vpn_status
         except Exception:
             pass
         self._last_vpn_status = (False, "")
-        self._last_vpn_check_ts = now
         return self._last_vpn_status
 
     def get_uptime_percentage(self) -> float:

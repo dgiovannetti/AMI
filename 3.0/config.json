@@ -2,7 +2,7 @@
   "app": {
     "name": "AMI",
     "subtitle": "Active Monitor of Internet",
-    "version": "3.2.2",
+    "version": "3.3.0",
     "copyright": "© 2025–2026 CiaoIM™ by Daniel Giovannetti",
     "website": "https://ciaoim.tech/projects/ami",
     "tagline": "Crafted logic. Measured force. Front-end vision, compiled systems, and hardcoded ethics.",
@@ -68,5 +68,8 @@
     "timeout_seconds": 30,
     "tier_low_mbps": 100,
     "tier_high_mbps": 1000
+  },
+  "privacy": {
+    "lookup_public_network": true
   }
 }

@@ -17,14 +17,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-3.1.4-brightgreen" alt="Version"/>
+  <img src="https://img.shields.io/badge/version-3.3.0-brightgreen" alt="Version"/>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-blue" alt="Platform"/>
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"/>
   <img src="https://img.shields.io/badge/status-public-success" alt="Status"/>
   <img src="https://img.shields.io/badge/accessibility-WCAG%202.1-purple" alt="Accessibility"/>
 </p>
 
-> **Current product line: AMI 3.x** — active development lives in **[`3.0/`](3.0/)** (PyQt6, themes, OTA, speed test). This README describes the project as a whole; for 3.x run/build details see **[`3.0/README.md`](3.0/README.md)** and **`ami.__version__`** (now **3.1.4**).
+> **Current product line: AMI 3.x** — active development lives in **[`3.0/`](3.0/)** (PyQt6, themes, OTA, speed test). This README describes the project as a whole; for 3.x run/build details see **[`3.0/README.md`](3.0/README.md)** and **`ami.__version__`** (now **3.3.0**).
 
 ---
 
@@ -129,19 +129,13 @@ AMI features a **completely redesigned UI** inspired by Stripe, Vercel, and mode
 ```bash
 # Clone the repository
 git clone https://github.com/dgiovannetti/AMI.git
-cd AMI
+cd AMI/3.0
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Install Pillow for icon generation
-pip install Pillow
-
-# Generate icons
-python tools/generate_icons.py
-
 # Run the application
-python src/tray_app.py
+python run.py
 ```
 
 ## 🔧 Configuration
@@ -220,10 +214,8 @@ AMI creates a CSV log file (`ami_log.csv`) with columns:
 To create a standalone executable:
 
 ```bash
-# Install PyInstaller
-pip install pyinstaller
-
-# Run the build script
+cd 3.0
+pip install -r requirements.txt pyinstaller
 python build.py
 ```
 
@@ -240,28 +232,14 @@ The final executable will be in `dist/AMI-Package/AMI.exe`
 
 ```
 AMI/
-├── config.json              # Configuration file
-├── requirements.txt         # Python dependencies
-├── build.py                # Build script for executable
-├── README.md               # This file
-├── .gitignore             # Git ignore rules
-│
-├── src/                   # Source code
-│   ├── __init__.py
-│   ├── tray_app.py       # Main application & system tray
-│   ├── network_monitor.py # Network monitoring engine
-│   ├── dashboard.py      # Dashboard window
-│   ├── logger.py         # Event logging
-│   └── notifier.py       # Notification system
-│
-├── tools/                # Build tools
-│   └── generate_icons.py # Icon generator script
-│
-└── resources/            # Application resources
-    ├── ami.ico          # Windows icon
-    ├── ami.png          # Main icon
-    ├── ami_logo.png     # Logo
-    └── status_*.png     # Status icons
+├── 3.0/                     # Current product (run: python run.py)
+│   ├── src/ami/             # core, services, ui
+│   ├── tests/
+│   ├── config.json
+│   └── resources/
+├── archive/2.x/             # Frozen 2.1.2 — do not extend
+├── tools/                   # Icon helpers
+└── index.html               # Marketing page
 ```
 
 ## 🔍 How It Works

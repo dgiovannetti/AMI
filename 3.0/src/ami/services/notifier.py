@@ -40,9 +40,9 @@ class Notifier:
         if self.last_status is None:
             return False
         if new_status != self.last_status:
-            if new_status == "offline" and self.notify_on_disconnect:
+            if new_status in ("offline", "captive") and self.notify_on_disconnect:
                 return True
-            if new_status == "online" and self.last_status in ("offline", "unstable") and self.notify_on_reconnect:
+            if new_status == "online" and self.last_status in ("offline", "unstable", "captive") and self.notify_on_reconnect:
                 return True
             if new_status == "unstable" and self.notify_on_unstable:
                 return True
@@ -55,6 +55,8 @@ class Notifier:
         title = "AMI - Active Monitor of Internet"
         if status == "online":
             full_message = f"🟢 Connection Restored\n{message}"
+        elif status == "captive":
+            full_message = f"🟡 Not really online\nCaptive portal or HTTP blocked\n{message}"
         elif status == "unstable":
             full_message = f"🟡 Unstable Connection\n{message}"
         else:

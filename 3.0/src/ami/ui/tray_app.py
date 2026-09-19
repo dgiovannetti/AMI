@@ -20,16 +20,24 @@ from PyQt6.QtWidgets import (
 
 from ami import __version__
 from ami.core.config import get_config_path_for_ui, load_config, save_config
+from ami.core.models import reason_text
 from ami.core.paths import get_base_path, get_user_data_dir
 from ami.services.api_server import APIServer
 from ami.services.logger import EventLogger
+from ami.services.session_recorder import SessionRecorder
 from ami.services.network_monitor import NetworkMonitor
 from ami.services.notifier import Notifier
 from ami.services.speed_test import run_speed_test
 from ami.services.startup import sync_autostart
 from ami.services.updater import UpdateManager
 from ami.ui.compact_status import CompactStatusWindow
-from ami.ui.qt_safe import announce_crash_log_path, install_exception_handlers, quit_log_path, safe_slot
+from ami.ui.qt_safe import (
+    announce_crash_log_path,
+    install_exception_handlers,
+    log_diagnostic,
+    quit_log_path,
+    safe_slot,
+)
 from ami.ui.settings_dialog import SettingsDialog
 from ami.ui.splash_screen import UltraModernSplashScreen
 from ami.ui.update_dialog import UpdateDialog
@@ -92,6 +100,18 @@ def _apply_macos_dock_presence(app: QApplication) -> None:
         app.setWindowIcon(ic)
         _tray_debug(f"macOS Dock: setWindowIcon from resources/{name}")
         return
+
+
+def _effective_show_dashboard_on_start(config: dict) -> bool:
+    """Config, AMI_FORCE_DASHBOARD / AMI_NO_DASHBOARD. From source on macOS, show a window."""
+    if os.environ.get("AMI_NO_DASHBOARD", "").strip() in ("1", "true", "yes"):
+        return False
+    if os.environ.get("AMI_FORCE_DASHBOARD", "").strip() in ("1", "true", "yes"):
+        return True
+    if config.get("ui", {}).get("show_dashboard_on_start", False):
+        return True
+    # Unfrozen macOS: tray-only looks like "nothing is running".
+    return sys.platform == "darwin" and not _is_pyinstaller_frozen()
 
 
 def _effective_compact_status_window(config: dict) -> bool:
@@ -194,6 +214,8 @@ class SystemTrayApp:
         self._macos_tray_title_fallback = False
         self.config = self.load_config()
         app_version = _effective_app_version(self.config)
+        self.recorder = SessionRecorder(version=app_version)
+        self.app.aboutToQuit.connect(self._finalize_record_on_quit)
         use_compact = _effective_compact_status_window(self.config)
         sync_autostart(self.config.get("startup", {}).get("auto_start", False))
         # Cache icone tray (macOS template + Windows GDI-friendly reuse)
@@ -312,6 +334,8 @@ class SystemTrayApp:
         self.api_server = APIServer(self.config, self.monitor)
         self.current_status = None
         self._monitor_busy = False
+        self._monitor_queued = False
+        self._monitor_error = False
         splash_msg("Finalizing...")
         if self.splash:
             _process_init_events(self.app)
@@ -358,11 +382,8 @@ class SystemTrayApp:
             QTimer.singleShot(3000, self.close_splash)
         elif sys.platform == "darwin":
             QTimer.singleShot(0, self._finalize_macos_startup_ui)
-        if self.config.get("ui", {}).get("show_dashboard_on_start", False) or os.environ.get("AMI_FORCE_DASHBOARD") == "1":
-            if sys.platform == "darwin" and getattr(self, "_macos_control_panel", None) is not None:
-                QTimer.singleShot(400, self._macos_control_panel.show_centered)
-            else:
-                QTimer.singleShot(2500, self.show_dashboard)
+        if _effective_show_dashboard_on_start(self.config):
+            QTimer.singleShot(2500, self.show_dashboard)
         elif sys.platform == "darwin" and getattr(self, "_macos_control_panel", None) is not None:
             if self._should_auto_show_macos_control_panel():
                 QTimer.singleShot(400, self._macos_control_panel.show_centered)
@@ -633,6 +654,12 @@ class SystemTrayApp:
         mon.http_test_urls = new_config["monitoring"].get("http_test_urls") or []
         mon.timeout = new_config["monitoring"]["timeout"]
         mon.retry_count = new_config["monitoring"].get("retry_count", 2)
+        mon.lookup_public_network = bool(
+            (new_config.get("privacy") or {}).get("lookup_public_network", True)
+        )
+        if not mon.lookup_public_network:
+            mon._last_isp_info = None
+            mon._last_public_ip = None
         mon.enable_http_test = new_config["monitoring"].get("enable_http_test", True)
         mon.internal_test_mode = new_config["monitoring"].get("internal_test_mode", False)
         mon.unstable_latency = new_config["thresholds"]["unstable_latency_ms"]
@@ -678,49 +705,126 @@ class SystemTrayApp:
             self.speed_test_timer = None
         sync_autostart(new_config.get("startup", {}).get("auto_start", False))
 
+    def _tray_status_lines(self, status) -> dict:
+        """Shared readout for tooltip and menu so they cannot drift."""
+        labels = {
+            "online": "Online",
+            "unstable": "Unstable",
+            "captive": "Captive",
+            "offline": "Offline",
+        }
+        name = labels.get(getattr(status, "status", ""), "Unknown")
+        reason = getattr(status, "reason", None)
+        reason_line = reason_text(reason) if reason and reason != "ok" else ""
+        headline = f"{name} — {reason_line}" if reason_line else name
+        if getattr(self, "_monitor_error", False):
+            headline += " — monitor error"
+
+        lat = getattr(status, "avg_latency_ms", None)
+        latency = f"{lat:.0f} ms" if lat else None
+        try:
+            uptime_pct = self.monitor.get_uptime_percentage()
+            uptime_short = f"{uptime_pct:.1f}% uptime"
+            uptime = f"{uptime_pct:.1f}% ({self.monitor.get_uptime_duration()})"
+        except Exception:
+            uptime_short = "uptime —"
+            uptime = "—"
+
+        isp = None
+        if getattr(status, "isp", None):
+            ip = getattr(status, "public_ip", None)
+            isp = f"{status.isp}" + (f" ({ip})" if ip else "")
+
+        vpn = None
+        if getattr(status, "vpn_connected", None) is not None:
+            if status.vpn_connected:
+                prov = getattr(status, "vpn_provider", None)
+                vpn = "On" + (f" [{prov}]" if prov else "")
+            else:
+                vpn = "Off"
+
+        speed = None
+        speed_mbps = getattr(status, "speed_mbps", None)
+        speed_tier = getattr(status, "speed_tier", None)
+        if speed_tier is not None and speed_mbps is not None:
+            if speed_mbps >= 1000:
+                speed = f"{speed_mbps / 1000:.2f} Gbps ({speed_tier.capitalize()})"
+            else:
+                speed = f"{speed_mbps:.0f} Mbps ({speed_tier.capitalize()})"
+
+        tip = [f"AMI  ·  {name}", "  ·  ".join(bit for bit in (latency, uptime_short) if bit)]
+        if reason_line:
+            tip.append(reason_line)
+        if isp:
+            tip.append(isp)
+        if vpn:
+            tip.append(f"VPN: {vpn}")
+        if speed:
+            tip.append(speed)
+        if getattr(self, "_monitor_error", False):
+            tip.append("Monitor error")
+        return {
+            "tooltip": "\n".join(tip),
+            "headline": headline,
+            "latency": latency,
+            "uptime": uptime,
+            "isp": isp,
+            "vpn": vpn,
+            "speed": speed,
+        }
+
     def create_menu(self) -> None:
         self._tray_menu = QMenu()
         menu = self._tray_menu
-        self.status_action = QAction("Status: Checking...", menu)
+        self.status_action = QAction("Checking…", menu)
         self.status_action.setEnabled(False)
         menu.addAction(self.status_action)
-        self.latency_action = QAction("Latency: --", menu)
+        self.latency_action = QAction("", menu)
         self.latency_action.setEnabled(False)
+        self.latency_action.setVisible(False)
         menu.addAction(self.latency_action)
-        self.uptime_action = QAction("Uptime: --", menu)
+        self.uptime_action = QAction("Uptime: —", menu)
         self.uptime_action.setEnabled(False)
         menu.addAction(self.uptime_action)
-        self.isp_action = QAction("ISP: --", menu)
+        self.isp_action = QAction("", menu)
         self.isp_action.setEnabled(False)
+        self.isp_action.setVisible(False)
         menu.addAction(self.isp_action)
-        self.vpn_action = QAction("VPN: --", menu)
+        self.vpn_action = QAction("", menu)
         self.vpn_action.setEnabled(False)
+        self.vpn_action.setVisible(False)
         menu.addAction(self.vpn_action)
-        self.speed_action = QAction("Speed: --", menu)
+        self.speed_action = QAction("", menu)
         self.speed_action.setEnabled(False)
+        self.speed_action.setVisible(False)
         menu.addAction(self.speed_action)
         menu.addSeparator()
-        menu.addAction("📌 Show status window").triggered.connect(lambda *_: self.show_compact_status_window())
-        menu.addAction("🔄 Test Now").triggered.connect(lambda *_: self.manual_test())
-        menu.addAction("⚡ Speed test now").triggered.connect(lambda *_: self._speed_test_now())
-        menu.addAction("📊 Dashboard").triggered.connect(lambda *_: self.show_dashboard())
+        menu.addAction("Dashboard").triggered.connect(lambda *_: self.show_dashboard())
+        menu.addAction("Check now").triggered.connect(lambda *_: self.manual_test())
+        menu.addAction("Speed test").triggered.connect(lambda *_: self._speed_test_now())
+        menu.addAction("Show status window").triggered.connect(lambda *_: self.show_compact_status_window())
         menu.addSeparator()
-        menu.addAction("⚙️ Settings").triggered.connect(lambda *_: self.show_settings())
-        menu.addAction("📄 View Logs").triggered.connect(lambda *_: self.view_logs())
-        menu.addAction("🔔 Test Notification").triggered.connect(lambda *_: self.test_notification())
+        menu.addAction("Settings").triggered.connect(lambda *_: self.show_settings())
+        menu.addAction("Logs").triggered.connect(lambda *_: self.view_logs())
+        self.record_action = menu.addAction("Record for ISP")
+        self.record_action.triggered.connect(lambda *_: self.toggle_isp_record())
+        menu.addAction("Test notification").triggered.connect(lambda *_: self.test_notification())
         if self.updater:
-            menu.addAction("🔄 Check for Updates").triggered.connect(lambda *_: self.check_for_updates(True))
+            menu.addAction("Check for updates").triggered.connect(lambda *_: self.check_for_updates(True))
         menu.addSeparator()
-        menu.addAction("ℹ️ About").triggered.connect(lambda *_: self.show_about())
-        menu.addAction("❌ Exit").triggered.connect(lambda *_: self.exit_app())
+        menu.addAction("About").triggered.connect(lambda *_: self.show_about())
+        menu.addAction("Quit").triggered.connect(lambda *_: self.exit_app())
         self.tray_icon.setContextMenu(menu)
 
     def _apply_tray_icon_for_status(self, status: str) -> None:
-        """Icona tray (menu bar): PNG ufficiali status_green|yellow|red."""
-        path = get_base_path() / "resources" / {
-            "online": "status_green.png",
-            "unstable": "status_yellow.png",
-        }.get(status, "status_red.png")
+        """Icona tray (menu bar): PNG ufficiali status_green|yellow|red. captive = giallo."""
+        if status == "online":
+            name = "status_green.png"
+        elif status in ("unstable", "captive"):
+            name = "status_yellow.png"
+        else:
+            name = "status_red.png"
+        path = get_base_path() / "resources" / name
         badge = getattr(self, "_macos_menu_badge", None)
         if badge is not None and path.is_file():
             badge.set_status_icon_path(path)
@@ -733,7 +837,7 @@ class SystemTrayApp:
         self.tray_icon.setIcon(self._resolve_tray_icon(path, status))
 
     def _resolve_tray_icon(self, path: Path, status: str) -> QIcon:
-        color_key = "green" if status == "online" else "yellow" if status == "unstable" else "red"
+        color_key = "green" if status == "online" else "yellow" if status in ("unstable", "captive") else "red"
         if sys.platform == "darwin":
             return self._macos_tray_icon_from_status_png(path, color_key)
         if path.exists():
@@ -959,56 +1063,45 @@ class SystemTrayApp:
         self._apply_tray_icon_for_status(status)
 
     def update_tooltip(self, status) -> None:
-        parts = ["AMI - Active Monitor of Internet", f"{'🟢' if status.status == 'online' else '🟡' if status.status == 'unstable' else '🔴'} {status.status.upper()}"]
-        if status.avg_latency_ms:
-            parts.append(f"Latency: {status.avg_latency_ms:.0f}ms")
-        parts.append(f"Uptime: {self.monitor.get_uptime_percentage():.1f}%")
-        if getattr(status, "isp", None):
-            parts.append(f"ISP: {status.isp}" + (f" ({status.public_ip})" if getattr(status, "public_ip", None) else ""))
-        if getattr(status, "vpn_connected", None) is not None:
-            parts.append("VPN: ON" if status.vpn_connected else "VPN: OFF")
-        speed_mbps = getattr(status, "speed_mbps", None)
-        speed_tier = getattr(status, "speed_tier", None)
-        if speed_tier is not None and speed_mbps is not None:
-            if speed_mbps >= 1000:
-                parts.append(f"Speed: {speed_mbps / 1000:.2f} Gbps ({speed_tier.capitalize()})")
-            else:
-                parts.append(f"Speed: {speed_mbps:.0f} Mbps ({speed_tier.capitalize()})")
-        else:
-            parts.append("Speed: —")
-        tip = "\n".join(parts)
+        tip = self._tray_status_lines(status)["tooltip"]
         self.tray_icon.setToolTip(tip)
         badge = getattr(self, "_macos_menu_badge", None)
         if badge is not None:
             badge.setToolTip(tip)
 
     def update_menu_info(self, status) -> None:
-        self.status_action.setText(f"{'🟢' if status.status == 'online' else '🟡' if status.status == 'unstable' else '🔴'} {status.status.upper()}")
-        self.latency_action.setText(f"Latency: {status.avg_latency_ms:.0f}ms" if status.avg_latency_ms else "Latency: N/A")
-        self.uptime_action.setText(f"Uptime: {self.monitor.get_uptime_percentage():.1f}% ({self.monitor.get_uptime_duration()})")
-        try:
-            self.isp_action.setText(f"ISP: {status.isp} ({status.public_ip})" if getattr(status, "isp", None) else "ISP: N/A")
-        except Exception:
-            self.isp_action.setText("ISP: N/A")
-        try:
-            self.vpn_action.setText("VPN: ON" + (f" [{status.vpn_provider}]" if getattr(status, "vpn_provider", None) else "") if getattr(status, "vpn_connected", None) else "VPN: OFF")
-        except Exception:
-            self.vpn_action.setText("VPN: Unknown")
-        speed_mbps = getattr(status, "speed_mbps", None)
-        speed_tier = getattr(status, "speed_tier", None)
-        if speed_tier is not None and speed_mbps is not None:
-            if speed_mbps >= 1000:
-                self.speed_action.setText(f"Speed: {speed_mbps / 1000:.2f} Gbps ({speed_tier.capitalize()})")
-            else:
-                self.speed_action.setText(f"Speed: {speed_mbps:.0f} Mbps ({speed_tier.capitalize()})")
+        info = self._tray_status_lines(status)
+        self.status_action.setText(info["headline"])
+        if info["latency"]:
+            self.latency_action.setText(info["latency"])
+            self.latency_action.setVisible(True)
         else:
-            self.speed_action.setText("Speed: —")
+            self.latency_action.setVisible(False)
+        self.uptime_action.setText(info["uptime"])
+        if info["isp"]:
+            self.isp_action.setText(info["isp"])
+            self.isp_action.setVisible(True)
+        else:
+            self.isp_action.setVisible(False)
+        if info["vpn"]:
+            self.vpn_action.setText(f"VPN: {info['vpn']}")
+            self.vpn_action.setVisible(True)
+        else:
+            self.vpn_action.setVisible(False)
+        if info["speed"]:
+            self.speed_action.setText(info["speed"])
+            self.speed_action.setVisible(True)
+        else:
+            self.speed_action.setVisible(False)
 
     @safe_slot
     def check_connection(self) -> None:
         if getattr(self, "_monitor_busy", False):
+            # Keep one follow-up so a slow check does not drop the next tick.
+            self._monitor_queued = True
             return
         self._monitor_busy = True
+        self._monitor_queued = False
         bridge = self._monitor_bridge
         monitor = self.monitor
 
@@ -1016,19 +1109,38 @@ class SystemTrayApp:
             status = None
             try:
                 status = monitor.check_connection()
-            except Exception:
+            except Exception as exc:
+                log_diagnostic("monitor.check_connection", exc)
                 status = None
             finally:
                 bridge.finished.emit(status)
 
         threading.Thread(target=work, daemon=True).start()
 
+    def _show_monitor_error(self) -> None:
+        self._monitor_error = True
+        if self.current_status is not None:
+            self.update_tooltip(self.current_status)
+            self.update_menu_info(self.current_status)
+            return
+        tip = "AMI - Active Monitor of Internet\nMonitor error — no status yet"
+        self.tray_icon.setToolTip(tip)
+        badge = getattr(self, "_macos_menu_badge", None)
+        if badge is not None:
+            badge.setToolTip(tip)
+
     @safe_slot
     def _on_monitor_finished(self, status) -> None:
         self._monitor_busy = False
+        queued = getattr(self, "_monitor_queued", False)
+        self._monitor_queued = False
         if status is None:
-            return
-        self.on_status_updated(status)
+            self._show_monitor_error()
+        else:
+            self._monitor_error = False
+            self.on_status_updated(status)
+        if queued:
+            QTimer.singleShot(0, self.check_connection)
 
     @safe_slot
     def on_status_updated(self, status) -> None:
@@ -1052,12 +1164,16 @@ class SystemTrayApp:
         if panel is not None:
             lat = getattr(status, "avg_latency_ms", None)
             panel.update_status(status.status, lat)
-        QTimer.singleShot(0, lambda s=status: self._start_status_enrichment(s))
+        QTimer.singleShot(0, lambda s=status: self._queue_enrich_or_record(s))
 
-    def _start_status_enrichment(self, status) -> None:
+    def _queue_enrich_or_record(self, status) -> None:
+        if not self._start_status_enrichment(status):
+            self._record_sample(status)
+
+    def _start_status_enrichment(self, status) -> bool:
         """ISP/VPN in background after icon update (does not delay online/offline)."""
         if getattr(self, "_enrich_busy", False):
-            return
+            return False
         if status is None or getattr(status, "status", None) == "offline":
             # Still refresh VPN/ISP caches occasionally when offline, but don't block.
             pass
@@ -1075,6 +1191,7 @@ class SystemTrayApp:
                 bridge.finished.emit(enriched)
 
         threading.Thread(target=work, daemon=True).start()
+        return True
 
     @safe_slot
     def _on_enrich_finished(self, status) -> None:
@@ -1084,12 +1201,14 @@ class SystemTrayApp:
         # Only refresh metadata if this enrichment is still for the current line state.
         cur = getattr(self, "current_status", None)
         if cur is not None and getattr(cur, "status", None) != getattr(status, "status", None):
+            self._record_sample(status)
             return
         self.current_status = status
         self.update_tooltip(status)
         self.update_menu_info(status)
         if self.dashboard and self.dashboard.isVisible():
             self.dashboard.update_data(status, self.monitor.get_statistics())
+        self._record_sample(status)
 
     @safe_slot
     def _on_speed_test_finished(self) -> None:
@@ -1108,7 +1227,7 @@ class SystemTrayApp:
         st_cfg = self.config.get("speed_test", {})
         if not st_cfg.get("enabled", False):
             return
-        if self.current_status is None or self.current_status.status == "offline":
+        if self.current_status is None or self.current_status.status in ("offline", "captive"):
             return
         url = st_cfg.get("test_url", "").strip()
         if not url:
@@ -1158,6 +1277,7 @@ class SystemTrayApp:
         if self.dashboard is None:
             from ami.ui.dashboard import EnterpriseDashboard
             self.dashboard = EnterpriseDashboard(self.config, self.monitor, self.tray_icon)
+            self.dashboard.bind_record(self.toggle_isp_record, self.recorder.recording)
         status = self.current_status or self.monitor.last_status
         if status is not None:
             self.dashboard.update_data(status, self.monitor.get_statistics())
@@ -1182,6 +1302,48 @@ class SystemTrayApp:
             self.save_config()
             self._notify_user("AMI Settings", "Settings saved and applied")
             self.check_connection()
+
+    def toggle_isp_record(self, *_args) -> None:
+        if self.recorder.recording:
+            self.recorder.stop()
+            self._sync_record_ui()
+            self._reveal_records_dir()
+            return
+        self.recorder.start()
+        self._sync_record_ui()
+        if getattr(self, "current_status", None) is not None:
+            self.recorder.record(self.current_status)
+
+    def _sync_record_ui(self) -> None:
+        active = self.recorder.recording
+        action = getattr(self, "record_action", None)
+        if action is not None:
+            action.setText("Stop recording" if active else "Record for ISP")
+        dash = getattr(self, "dashboard", None)
+        if dash is not None:
+            dash.set_recording(active)
+
+    def _record_sample(self, status) -> None:
+        rec = getattr(self, "recorder", None)
+        if rec is not None and rec.recording and status is not None:
+            rec.record(status)
+
+    def _finalize_record_on_quit(self) -> None:
+        rec = getattr(self, "recorder", None)
+        if rec is not None and rec.recording:
+            rec.stop()
+
+    def _reveal_records_dir(self) -> None:
+        folder = self.recorder.records_dir
+        folder.mkdir(parents=True, exist_ok=True)
+        target = str(folder)
+        if sys.platform == "win32":
+            os.startfile(target)
+        else:
+            import subprocess
+
+            opener = "open" if sys.platform == "darwin" else "xdg-open"
+            subprocess.call([opener, target])
 
     def view_logs(self) -> None:
         log_path = get_user_data_dir() / self.config["logging"]["log_file"]

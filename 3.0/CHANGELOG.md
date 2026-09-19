@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 3.3.0
+
+- **Dashboard**: light canvas, one accent, no rainbow header or card shadows. Status ribbon uses four solid colors (online, unstable, captive, offline). ISP, public IP, and VPN cards. GitHub link: “Lascia una stella su GitHub”.
+- **ISP record**: start/stop from dashboard and tray. Dedicated CSV + Italian summary in `records/` for support tickets.
+- **VPN**: local path fingerprint invalidates ISP/IP cache on connect/disconnect. VPN On only from a real tunnel, not from the ISP name or a leftover `utun`.
+- **Classifier**: ping OK + HTTP not 200/204 → `captive`. Uptime counts only `online`. `retry_count` extra probes.
+- **OTA**: refuse download/install if the SHA256 is missing, malformed, or does not match.
+- **Privacy**: `lookup_public_network` defaults to on. An explicit false stays off.
+- **macOS from source**: after splash, open the dashboard so a tray-only session is not mistaken for a dead process.
+- **Repo**: 2.x sources moved to `archive/2.x/`.
+
 ## 3.2.2
 
 - **Windows stability**: ping.exe locale-agnostic (`durata=`/`Zeit=`/`temps=`/…); no ping3/DNS cascade after a conclusive `ping.exe` result.

@@ -35,6 +35,8 @@ if [[ "$(uname -s)" == "Darwin" && -d "$ROOT/dist/AMI.app" ]]; then
 fi
 
 export PYTHONPATH=src
+# From source the menu-bar icon is easy to miss; open the dashboard.
+export AMI_FORCE_DASHBOARD="${AMI_FORCE_DASHBOARD:-1}"
 LOG="${TMPDIR:-/tmp}/ami-launch.log"
 nohup python3 -m ami.main >> "$LOG" 2>&1 &
 echo "$!" > "${TMPDIR:-/tmp}/ami-launch.pid"

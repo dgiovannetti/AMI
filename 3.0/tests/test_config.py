@@ -14,6 +14,10 @@ def test_default_config_matches_schema():
     jsonschema.validate(instance=DEFAULT_CONFIG, schema=schema)
 
 
+def test_default_lookup_public_network_is_on():
+    assert DEFAULT_CONFIG["privacy"]["lookup_public_network"] is True
+
+
 def test_migrate_adds_speed_test_section():
     legacy = {
         "app": {"version": "2.1.0"},
@@ -29,6 +33,14 @@ def test_migrate_adds_speed_test_section():
     migrated = _migrate_from_2x(legacy)
     assert "speed_test" in migrated
     assert migrated["app"]["version"].startswith("3.")
+    assert migrated["privacy"]["lookup_public_network"] is True
+
+
+def test_migrate_keeps_explicit_privacy_opt_out():
+    cfg = json.loads(json.dumps(DEFAULT_CONFIG))
+    cfg["privacy"]["lookup_public_network"] = False
+    migrated = _migrate_from_2x(cfg)
+    assert migrated["privacy"]["lookup_public_network"] is False
 
 
 def test_migrate_rewrites_deprecated_speed_url():

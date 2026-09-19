@@ -54,6 +54,7 @@ class SettingsDialog(QDialog):
         btn_row.addStretch()
         self.btn_cancel = QPushButton("Cancel")
         self.btn_save = QPushButton("Save Settings")
+        self.btn_save.setObjectName("PrimaryButton")
         self.btn_cancel.clicked.connect(self.reject)
         self.btn_save.clicked.connect(self._on_save)
         btn_row.addWidget(self.btn_cancel)
@@ -85,6 +86,9 @@ class SettingsDialog(QDialog):
         self.retry_count = QSpinBox()
         self.retry_count.setRange(0, 10)
         self.retry_count.setValue(int(self._config["monitoring"].get("retry_count", 2)))
+        self.retry_count.setToolTip(
+            "Extra attempts after a failed ping or HTTP probe. 0 keeps checks fail-fast."
+        )
         form.addRow("Retry count:", self.retry_count)
         self.enable_http = QCheckBox("Enable HTTP connectivity test")
         self.enable_http.setChecked(bool(self._config["monitoring"].get("enable_http_test", True)))
@@ -247,6 +251,14 @@ class SettingsDialog(QDialog):
         self.compact_status = QCheckBox("Compact status window (Dock fallback)")
         self.compact_status.setChecked(bool(ui_cfg.get("compact_status_window", False)))
         form.addRow("", self.compact_status)
+        self.lookup_public = QCheckBox("Look up public IP and ISP")
+        self.lookup_public.setChecked(
+            bool((self._config.get("privacy") or {}).get("lookup_public_network", True))
+        )
+        self.lookup_public.setToolTip(
+            "Sends a request to ipinfo.io, ipapi.co, or ifconfig.co."
+        )
+        form.addRow("", self.lookup_public)
         self.tabs.addTab(tab, "UI")
 
     def _on_save(self) -> None:
@@ -304,6 +316,8 @@ class SettingsDialog(QDialog):
         cfg["ui"]["theme"] = self.theme.currentText()
         cfg["ui"]["show_dashboard_on_start"] = bool(self.show_dash.isChecked())
         cfg["ui"]["compact_status_window"] = bool(self.compact_status.isChecked())
+        cfg.setdefault("privacy", {})
+        cfg["privacy"]["lookup_public_network"] = bool(self.lookup_public.isChecked())
         self._config = cfg
 
     def get_config(self) -> Dict:

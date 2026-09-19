@@ -4,7 +4,7 @@
 > Usa **`build_windows.bat`** dalla root del repo oppure i comandi in **`BUILD_WINDOWS_QUICK.md`**.  
 > Su GitHub Actions: **`build.yml`** (branch `main` / PR, path `3.0/**`); per ogni **tag `v*`** lo workflow **`release-3.0.yml`** allega gli ZIP **Windows + macOS** alla Release (nomi con `windows` / `macos` per l’aggiornamento OTA).
 
-La sezione *Procedura completa* qui sotto descrive ancora il layout **2.x** nella root (`pip install` + `python build.py` senza `cd 3.0`). Per 3.x **non** usare quel flusso: entra in **`3.0`** come nella quick guide.
+La sezione *Procedura completa* qui sotto descrive il layout **2.x**, ora in **`archive/2.x/`** (congelato, non usarlo per le build). Per 3.x entra in **`3.0`** come nella quick guide.
 
 ## Requisiti
 
@@ -14,21 +14,21 @@ La sezione *Procedura completa* qui sotto descrive ancora il layout **2.x** nell
 
 ---
 
-## 🚀 Procedura Completa (legacy 2.x — root repo)
+## 🚀 Procedura Completa (legacy 2.x — `archive/2.x/`, non usare)
+
+I file di questa procedura (`AMI.py`, `build.py`, `requirements.txt`) stanno in **`archive/2.x/`**. La linea attuale è `3.0/`.
 
 ### 1️⃣ Clona il Repository (se necessario)
 
 ```bash
 # Clona da GitHub
 git clone https://github.com/YOUR_USERNAME/AMI.git
-cd AMI
-
-# Oppure copia i file direttamente
+cd AMI/archive/2.x
 ```
 
 ### 2️⃣ Installa Dipendenze
 
-Apri **PowerShell** o **CMD** nella cartella AMI:
+Apri **PowerShell** o **CMD** in `archive/2.x`:
 
 ```bash
 # Installa dipendenze runtime
